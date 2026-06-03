@@ -1,9 +1,22 @@
-#pragma kernel Initialize
-#pragma kernel InjectDensity
-#pragma kernel Simulate
+#pragma kernel Init
+#pragma kernel Step
 
-// The 3D texture storing our explosion data (r = density, g = heat)
-RWTexture3D<float4> VolumeTexture;
+// r = heat, g = smoke density
+RWTexture3D<float4> SmokePropWrite;
+//RWTexture3D<float4> VelocityWrite;
+
+Texture3D<float4> SmokePropRead;
+//Texture3D<float4> VelocityRead;
+
+/*
+SamplerState sampler_LinearClamp
+{
+    Filter = MIN_MAG_MIP_LINEAR;
+    AddressU = Clamp;
+    AddressV = Clamp;
+    AddressW = Clamp;
+};
+*/
 
 float Time;
 float DeltaTime;
@@ -17,36 +30,32 @@ float SimScale;
 // Injection Data
 float3 InjectWorldPos;
 float InjectRadius;
+bool IsInjecting;
 
 [numthreads(8, 8, 8)]
-void Initialize (uint3 id : SV_DispatchThreadID)
+void Init (uint3 id : SV_DispatchThreadID)
 {
-    VolumeTexture[id] = float4(0.0, 0.0, 0.0, 0.0);
+    SmokePropWrite[id] = float4(0.0, 0.0, 0.0, 0.0);
 }
 
 [numthreads(8, 8, 8)]
-void InjectDensity (uint3 id : SV_DispatchThreadID)
+void Step (uint3 id : SV_DispatchThreadID)
 {
+    float4 smokeProps = SmokePropRead[id];
+
     // +.5 to sample the center of the the voxel
     float3 uvw = ((float3(id) + 0.5) / float(Resolution));
-    float3 center = BoundsMin + (uvw * BoundsSize);
-    float dist = distance(center, InjectWorldPos);
-
-    // Inject a sphere of density/heat at the center
-    if (dist < InjectRadius)
-    {
-        VolumeTexture[id] = float4(1.0, 1.0, 0.0, 0.0);
-    }
-}
-
-[numthreads(8, 8, 8)]
-void Simulate (uint3 id : SV_DispatchThreadID)
-{
-    float4 cellData = VolumeTexture[id];
+    float3 cellWorldPos = BoundsMin + (uvw * BoundsSize);
 
     // For now just gently diffuse
-    cellData.x = max(0.0, cellData.x - (0.5 * DeltaTime)); // Fade density (smoke)
-    cellData.y = max(0.0, cellData.y - (1.5 * DeltaTime)); // Fade heat (fire) faster
+    smokeProps.x = max(0.0, smokeProps.x - (0.5 * DeltaTime)); // Fade density (smoke)
+    smokeProps.y = max(0.0, smokeProps.y - (1.5 * DeltaTime)); // Fade heat (fire) faster
 
-    VolumeTexture[id] = cellData;
+    // TODO // Surely square distance is fine
+    if (IsInjecting && distance(cellWorldPos, InjectWorldPos) < InjectRadius)
+    {
+        smokeProps = float4(1.0, 1.0, 0.0, 0.0);
+    }
+
+    SmokePropWrite[id] = smokeProps;
 }

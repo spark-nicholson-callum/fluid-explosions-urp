@@ -9,40 +9,45 @@ public class ExplosionManager : MonoBehaviour
     [SerializeField] private float injectRadius = 1.5f;
     [SerializeField] private Transform injectionPoint = null;
 
-    private RenderTexture volumeTexture;
+    private RenderTexture[] smokePropTexture = new RenderTexture[2];
+
+    // Double buffer index
+    // TODO // Probably worth it to make a class to manage this
+    private int read = 0;
+    private int write = 1;
+
     private Material rayMarchMaterial;
 
     private int initKernel;
-    private int injectKernel;
-    private int simulateKernel;
+    private int stepKernel;
 
     void Start()
     {
-        volumeTexture = new RenderTexture(resolution, resolution, 0, RenderTextureFormat.ARGBHalf);
-        volumeTexture.dimension = UnityEngine.Rendering.TextureDimension.Tex3D;
-        volumeTexture.volumeDepth = resolution;
-        volumeTexture.enableRandomWrite = true;
-        volumeTexture.Create();
-
-        initKernel = fluidSimCompute.FindKernel("Initialize");
-        injectKernel = fluidSimCompute.FindKernel("InjectDensity");
-        simulateKernel = fluidSimCompute.FindKernel("Simulate");
-
-        // Set Parameters
+        initKernel = fluidSimCompute.FindKernel("Init");
+        stepKernel = fluidSimCompute.FindKernel("Step");
         fluidSimCompute.SetInt("Resolution", resolution);
 
-        // Bind texture
-        fluidSimCompute.SetTexture(initKernel, "VolumeTexture", volumeTexture);
-        fluidSimCompute.SetTexture(injectKernel, "VolumeTexture", volumeTexture);
-        fluidSimCompute.SetTexture(simulateKernel, "VolumeTexture", volumeTexture);
+        for (int i = 0; i < 2; ++i)
+        {
+            smokePropTexture[i] = CreateVolume();
+
+            fluidSimCompute.SetTexture(initKernel, "SmokePropWrite", smokePropTexture[i]);
+            // TODO // Poll the thread group size instead
+            fluidSimCompute.Dispatch(initKernel, resolution / 8, resolution / 8, resolution / 8);
+        }
 
         rayMarchMaterial = GetComponent<Renderer>().material;
-        rayMarchMaterial.SetTexture("_VolumeTex", volumeTexture);
+    }
 
-        // Clear memory
-        // TODO // Poll the thread group size instead
-        fluidSimCompute.Dispatch(initKernel, resolution / 8, resolution / 8, resolution / 8);
-
+    RenderTexture CreateVolume()
+    {
+        RenderTexture rt = new RenderTexture(resolution, resolution, 0, RenderTextureFormat.ARGBHalf);
+        rt.dimension = UnityEngine.Rendering.TextureDimension.Tex3D;
+        rt.volumeDepth = resolution;
+        rt.enableRandomWrite = true;
+        rt.filterMode = FilterMode.Trilinear;
+        rt.Create();
+        return rt;
     }
 
     void Update()
@@ -55,23 +60,29 @@ public class ExplosionManager : MonoBehaviour
         fluidSimCompute.SetVector("BoundsMin", bounds.min);
         fluidSimCompute.SetVector("BoundsSize", bounds.size);
 
-        if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
-        {
-            Vector3 injectPos = injectionPoint != null ? injectionPoint.position : transform.position;
+        bool spacePressed = (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame);
+        fluidSimCompute.SetBool("IsInjecting", spacePressed);
 
-            fluidSimCompute.SetVector("InjectWorldPos", injectPos);
-            fluidSimCompute.SetFloat("InjectRadius", injectRadius);
+        Vector3 injectPos = injectionPoint != null ? injectionPoint.position : transform.position;
+        fluidSimCompute.SetVector("InjectWorldPos", injectPos);
+        fluidSimCompute.SetFloat("InjectRadius", injectRadius);
 
-            // TODO // Poll the thread group size instead
-            fluidSimCompute.Dispatch(injectKernel, resolution / 8, resolution / 8, resolution /8);
-        }
+        fluidSimCompute.SetTexture(stepKernel, "SmokePropRead", smokePropTexture[read]);
+        fluidSimCompute.SetTexture(stepKernel, "SmokePropWrite", smokePropTexture[write]);
 
         // TODO // Poll the thread group size instead
-        fluidSimCompute.Dispatch(simulateKernel, resolution / 8, resolution / 8, resolution / 8);
+        fluidSimCompute.Dispatch(stepKernel, resolution / 8, resolution / 8, resolution / 8);
+
+        rayMarchMaterial.SetTexture("_VolumeTex", smokePropTexture[write]);
+
+        (read, write) = (write, read);
     }
 
     void OnDestroy()
     {
-        if (volumeTexture != null) volumeTexture.Release();
+        for (int i = 0; i < 2; ++i)
+        {
+            if (smokePropTexture[i] != null) smokePropTexture[i].Release();
+        }
     }
 }
