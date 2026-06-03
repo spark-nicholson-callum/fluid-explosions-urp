@@ -10,6 +10,7 @@ public class ExplosionManager : MonoBehaviour
     [SerializeField] private Transform injectionPoint = null;
 
     private DoubleBuffer<RenderTexture> smokePropTexture;
+    private DoubleBuffer<RenderTexture> velocityTexture;
     private Material rayMarchMaterial;
 
     private int initKernel;
@@ -22,9 +23,11 @@ public class ExplosionManager : MonoBehaviour
         fluidSimCompute.SetInt("Resolution", resolution);
 
         smokePropTexture = new(CreateVolume(), CreateVolume());
+        velocityTexture = new(CreateVolume(), CreateVolume());
         for (int i = 0; i < 2; ++i)
         {
             fluidSimCompute.SetTexture(initKernel, "SmokePropWrite", smokePropTexture.WriteBuffer);
+            fluidSimCompute.SetTexture(initKernel, "VelocityWrite", velocityTexture.WriteBuffer);
             // TODO // Poll the thread group size instead
             fluidSimCompute.Dispatch(initKernel, resolution / 8, resolution / 8, resolution / 8);
 
@@ -63,7 +66,10 @@ public class ExplosionManager : MonoBehaviour
         fluidSimCompute.SetFloat("InjectRadius", injectRadius);
 
         fluidSimCompute.SetTexture(stepKernel, "SmokePropRead", smokePropTexture.ReadBuffer);
+        fluidSimCompute.SetTexture(stepKernel, "VelocityRead", velocityTexture.ReadBuffer);
+
         fluidSimCompute.SetTexture(stepKernel, "SmokePropWrite", smokePropTexture.WriteBuffer);
+        fluidSimCompute.SetTexture(stepKernel, "VelocityWrite", velocityTexture.WriteBuffer);
 
         // TODO // Poll the thread group size instead
         fluidSimCompute.Dispatch(stepKernel, resolution / 8, resolution / 8, resolution / 8);
@@ -71,10 +77,12 @@ public class ExplosionManager : MonoBehaviour
         rayMarchMaterial.SetTexture("_VolumeTex", smokePropTexture.WriteBuffer);
 
         smokePropTexture.SwapBuffers();
+        velocityTexture.SwapBuffers();
     }
 
     void OnDestroy()
     {
         smokePropTexture.ForEach(t => {if (t != null) t.Release();});
+        velocityTexture.ForEach(t => {if (t != null) t.Release();});
     }
 }

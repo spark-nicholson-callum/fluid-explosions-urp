@@ -3,12 +3,11 @@
 
 // r = heat, g = smoke density
 RWTexture3D<float4> SmokePropWrite;
-//RWTexture3D<float4> VelocityWrite;
+RWTexture3D<float4> VelocityWrite;
 
 Texture3D<float4> SmokePropRead;
-//Texture3D<float4> VelocityRead;
+Texture3D<float4> VelocityRead;
 
-/*
 SamplerState sampler_LinearClamp
 {
     Filter = MIN_MAG_MIP_LINEAR;
@@ -16,7 +15,6 @@ SamplerState sampler_LinearClamp
     AddressV = Clamp;
     AddressW = Clamp;
 };
-*/
 
 float Time;
 float DeltaTime;
@@ -41,21 +39,34 @@ void Init (uint3 id : SV_DispatchThreadID)
 [numthreads(8, 8, 8)]
 void Step (uint3 id : SV_DispatchThreadID)
 {
-    float4 smokeProps = SmokePropRead[id];
-
     // +.5 to sample the center of the the voxel
     float3 uvw = ((float3(id) + 0.5) / float(Resolution));
     float3 cellWorldPos = BoundsMin + (uvw * BoundsSize);
 
-    // For now just gently diffuse
-    smokeProps.x = max(0.0, smokeProps.x - (0.5 * DeltaTime)); // Fade density (smoke)
-    smokeProps.y = max(0.0, smokeProps.y - (1.5 * DeltaTime)); // Fade heat (fire) faster
+    float3 uvwVel = VelocityRead[id].xyz / BoundsSize;
+    float3 prevUvw = uvw - (uvwVel * DeltaTime * SimScale);
 
-    // TODO // Surely square distance is fine
+    float4 advectedSmokeProps = SmokePropRead.SampleLevel(sampler_LinearClamp, prevUvw, 0);
+    float4 advectedVel = VelocityRead.SampleLevel(sampler_LinearClamp, prevUvw, 0);
+
+    // Temp dampening, air resistance should be a thing but we should be more precise
+    advectedVel *= 0.99;
+
+    // TODO // Surely square distance is fine?
     if (IsInjecting && distance(cellWorldPos, InjectWorldPos) < InjectRadius)
     {
-        smokeProps = float4(1.0, 1.0, 0.0, 0.0);
+        advectedSmokeProps = float4(1.0, 1.0, 0.0, 0.0);
+    }
+    if (IsInjecting)
+    {
+        float3 burstDir = normalize(cellWorldPos - InjectWorldPos);
+        advectedVel.xyz = burstDir * 5.0;
     }
 
-    SmokePropWrite[id] = smokeProps;
+    // Temp diffusion (temp)
+    advectedSmokeProps.r = max(0.0, advectedSmokeProps.r - (0.5 * DeltaTime));
+    advectedSmokeProps.g = max(0.0, advectedSmokeProps.g - (1.5 * DeltaTime));
+
+    SmokePropWrite[id] = advectedSmokeProps;
+    VelocityWrite[id] = advectedVel;
 }
