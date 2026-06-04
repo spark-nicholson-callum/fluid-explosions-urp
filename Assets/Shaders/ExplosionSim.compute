@@ -6,6 +6,7 @@
 #pragma kernel Init
 #pragma kernel ComputeDivergence
 #pragma kernel PressureIteration
+#pragma kernel ProjectVelocity
 #pragma kernel Step
 
 // r = heat, g = smoke density
@@ -81,9 +82,9 @@ void ComputeDivergence(
     {
         uint3 pos = GetCachePos(i);
         int3 globalPos = int3(groupId * GROUP_SIZE) + int3(pos) - int3(1, 1, 1);
-
-        float3 uvw = (float3(globalPos) + 0.5) / float(Resolution);
-        velCache[i] = VelocityRead.SampleLevel(sampler_LinearClamp, uvw, 0).xyz;
+        globalPos = min(int3(0, 0, 0), globalPos);
+        globalPos = max(globalPos, int3(Resolution-1, Resolution-1, Resolution-1));
+        velCache[i] = VelocityRead[globalPos].xyz;
     }
 
     GroupMemoryBarrierWithGroupSync();
@@ -113,9 +114,9 @@ void PressureIteration(
     {
         uint3 pos = GetCachePos(i);
         int3 globalPos = int3(groupId * GROUP_SIZE) + int3(pos) - int3(1, 1, 1);
-
-        float3 uvw = (float3(globalPos) + 0.5) / float(Resolution);
-        pressureCache[i] = PressureRead.SampleLevel(sampler_LinearClamp, uvw, 0);
+        globalPos = min(int3(0, 0, 0), globalPos);
+        globalPos = max(globalPos, int3(Resolution-1, Resolution-1, Resolution-1));
+        pressureCache[i] = PressureRead[globalPos];
     }
 
     GroupMemoryBarrierWithGroupSync();
@@ -131,7 +132,43 @@ void PressureIteration(
 
     float dx = BoundsSize.x / float(Resolution);
     float div = DivergenceRead[id];
-    DivergenceWrite[id] = (pL + pR + pD + pU + pB + pF - (dx * dx * div)) / 6.0;
+    PressureWrite[id] = (pL + pR + pD + pU + pB + pF - (dx * dx * div)) / 6.0;
+}
+
+[numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
+void ProjectVelocity(
+    uint3 id : SV_DispatchThreadID,
+    uint3 groupId : SV_GroupID,
+    uint3 groupThreadId : SV_GroupThreadId,
+    uint groupIndex : SV_GroupIndex
+) {
+    [unroll]
+    for (uint i = groupIndex; i < TOTAL_CACHE; i += TOTAL_THREADS)
+    {
+        uint3 pos = GetCachePos(i);
+        int3 globalPos = int3(groupId * GROUP_SIZE) + int3(pos) - int3(1, 1, 1);
+        globalPos = min(int3(0, 0, 0), globalPos);
+        globalPos = max(globalPos, int3(Resolution-1, Resolution-1, Resolution-1));
+        pressureCache[i] = PressureRead[globalPos];
+    }
+
+    GroupMemoryBarrierWithGroupSync();
+
+    uint3 pos = groupThreadId + uint3(1, 1, 1); // Offset for the padding
+
+    float pL = pressureCache[GetCacheIndex(uint3(pos + int3(-1,  0,  0)))];
+    float pR = pressureCache[GetCacheIndex(uint3(pos + int3( 1,  0,  0)))];
+    float pD = pressureCache[GetCacheIndex(uint3(pos + int3( 0, -1,  0)))];
+    float pU = pressureCache[GetCacheIndex(uint3(pos + int3( 0,  1,  0)))];
+    float pB = pressureCache[GetCacheIndex(uint3(pos + int3( 0,  0, -1)))];
+    float pF = pressureCache[GetCacheIndex(uint3(pos + int3( 0,  0,  1)))];
+
+    float dx = BoundsSize.x / float(Resolution);
+    float3 vel = VelocityRead[id].xyz;
+    vel.x -= (pR - pL) / (2.0 * dx);
+    vel.y -= (pU - pD) / (2.0 * dx);
+    vel.z -= (pF - pB) / (2.0 * dx);
+    VelocityWrite[id] = float4(vel, 0.0);
 }
 
 [numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
@@ -154,9 +191,6 @@ void Step(uint3 id : SV_DispatchThreadID)
     if (IsInjecting && distance(cellWorldPos, InjectWorldPos) < InjectRadius)
     {
         advectedSmokeProps = float4(1.0, 1.0, 0.0, 0.0);
-    }
-    if (IsInjecting)
-    {
         float3 burstDir = normalize(cellWorldPos - InjectWorldPos);
         advectedVel.xyz = burstDir * 5.0;
     }

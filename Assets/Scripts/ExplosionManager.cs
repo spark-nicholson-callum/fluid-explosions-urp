@@ -3,11 +3,24 @@ using UnityEngine.InputSystem;
 
 public class ExplosionManager : MonoBehaviour
 {
+    public enum DebugMode {
+        None,
+        Divergence,
+        Pressure,
+    }
+
     [SerializeField] private ComputeShader fluidSimCompute;
     [SerializeField] private int resolution = 64;
     [SerializeField] private float simScale = 1.0f;
     [SerializeField] private float injectRadius = 1.5f;
     [SerializeField] private Transform injectionPoint = null;
+    [SerializeField] private int pressureIterations = 40;
+
+    [Header("Debugging")]
+    [SerializeField] private DebugMode debugMode = DebugMode.None;
+    [SerializeField] private MeshRenderer debugQuad;
+    [SerializeField][Range(0f, 1f)] public float zSlice = 0.5f;
+    [SerializeField] public float debugBoost = 1.0f;
 
     private DoubleBuffer<RenderTexture> velocityTexture;
     private DoubleBuffer<RenderTexture> divergenceTexture;
@@ -17,6 +30,8 @@ public class ExplosionManager : MonoBehaviour
 
     private int initKernel;
     private int divergenceKernel;
+    private int pressureKernel;
+    private int projectVelocityKernel;
     private int stepKernel;
 
     private int threadGroups;
@@ -25,6 +40,8 @@ public class ExplosionManager : MonoBehaviour
     {
         initKernel = fluidSimCompute.FindKernel("Init");
         divergenceKernel = fluidSimCompute.FindKernel("ComputeDivergence");
+        pressureKernel = fluidSimCompute.FindKernel("PressureIteration");
+        projectVelocityKernel = fluidSimCompute.FindKernel("ProjectVelocity");
         stepKernel = fluidSimCompute.FindKernel("Step");
         fluidSimCompute.SetInt("Resolution", resolution);
 
@@ -88,10 +105,28 @@ public class ExplosionManager : MonoBehaviour
         fluidSimCompute.Dispatch(divergenceKernel, threadGroups, threadGroups, threadGroups);
         divergenceTexture.SwapBuffers();
 
-        // Run simulation step
+        // Calculate pressure
+        fluidSimCompute.SetTexture(pressureKernel, "DivergenceRead", divergenceTexture.ReadBuffer);
+        for (int i = 0; i < pressureIterations; ++i)
+        {
+            fluidSimCompute.SetTexture(pressureKernel, "PressureRead", pressureTexture.ReadBuffer);
+            fluidSimCompute.SetTexture(pressureKernel, "PressureWrite", pressureTexture.WriteBuffer);
+
+            fluidSimCompute.Dispatch(pressureKernel, threadGroups, threadGroups, threadGroups);
+            pressureTexture.SwapBuffers();
+        }
+
+        // Project Velocity
+        fluidSimCompute.SetTexture(projectVelocityKernel, "PressureRead", pressureTexture.ReadBuffer);
+        fluidSimCompute.SetTexture(projectVelocityKernel, "VelocityRead", velocityTexture.ReadBuffer);
+        fluidSimCompute.SetTexture(projectVelocityKernel, "VelocityWrite", velocityTexture.WriteBuffer);
+
+        fluidSimCompute.Dispatch(projectVelocityKernel, threadGroups, threadGroups, threadGroups);
+        velocityTexture.SwapBuffers();
+
+        // Advection Step
         fluidSimCompute.SetTexture(stepKernel, "SmokePropRead", smokePropTexture.ReadBuffer);
         fluidSimCompute.SetTexture(stepKernel, "SmokePropWrite", smokePropTexture.WriteBuffer);
-
         fluidSimCompute.SetTexture(stepKernel, "VelocityRead", velocityTexture.ReadBuffer);
         fluidSimCompute.SetTexture(stepKernel, "VelocityWrite", velocityTexture.WriteBuffer);
 
@@ -101,6 +136,29 @@ public class ExplosionManager : MonoBehaviour
 
         // Share result with ray march material for rendering
         rayMarchMaterial.SetTexture("_VolumeTex", smokePropTexture.ReadBuffer);
+
+        DrawDebug();
+    }
+
+    void DrawDebug()
+    {
+        if (debugQuad == null) return;
+        debugQuad.gameObject.SetActive(debugMode != DebugMode.None);
+        if (debugMode == DebugMode.None) return;
+
+        Material debugMat = debugQuad.material;
+        debugMat.SetFloat("_ZSlice", zSlice);
+        debugMat.SetFloat("_Boost", debugBoost);
+
+        switch (debugMode)
+        {
+            case DebugMode.Divergence:
+                debugMat.SetTexture("_VolumeTex", divergenceTexture.ReadBuffer);
+                break;
+            case DebugMode.Pressure:
+                debugMat.SetTexture("_VolumeTex", pressureTexture.ReadBuffer);
+                break;
+        }
     }
 
     void OnDestroy()
