@@ -4,6 +4,8 @@
 #define TOTAL_CACHE (CACHE_SIZE * CACHE_SIZE * CACHE_SIZE) // 1000
 
 #pragma kernel Init
+#pragma kernel ComputeCurl
+#pragma kernel ExternalForces
 #pragma kernel ComputeDivergence
 #pragma kernel PressureIteration
 #pragma kernel ProjectVelocity
@@ -12,6 +14,9 @@
 // r = heat, g = smoke density
 RWTexture3D<float4> VelocityWrite;
 Texture3D<float4> VelocityRead;
+
+RWTexture3D<float4> CurlWrite;
+Texture3D<float4> CurlRead;
 
 RWTexture3D<float> DivergenceWrite;
 Texture3D<float> DivergenceRead;
@@ -44,8 +49,14 @@ float3 InjectWorldPos;
 float InjectRadius;
 bool IsInjecting;
 
+// Force Variables
+float Buoyancy;
+float SmokeWeight;
+float VorticityStrength;
+
 // Groupshare Cache
 groupshared float3 velCache[TOTAL_CACHE];
+groupshared float vorticityCache[TOTAL_CACHE];
 groupshared float pressureCache[TOTAL_CACHE];
 
 uint GetCacheIndex(uint3 pos)
@@ -65,9 +76,103 @@ uint3 GetCachePos(uint i)
 void Init(uint3 id : SV_DispatchThreadID)
 {
     VelocityWrite[id] = float4(0.0, 0.0, 0.0, 0.0);
+    CurlWrite[id] = float4(0.0, 0.0, 0.0, 0.0);
     DivergenceWrite[id] = 0.0;
     PressureWrite[id] = 0.0;
     SmokePropWrite[id] = float4(0.0, 0.0, 0.0, 0.0);
+}
+
+[numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
+void ComputeCurl(
+    uint3 id : SV_DispatchThreadID,
+    uint3 groupId : SV_GroupID,
+    uint3 groupThreadId : SV_GroupThreadId,
+    uint groupIndex : SV_GroupIndex
+) {
+    [unroll]
+    for (uint i = groupIndex; i < TOTAL_CACHE; i += TOTAL_THREADS)
+    {
+        uint3 pos = GetCachePos(i);
+        int3 globalPos = int3(groupId * GROUP_SIZE) + int3(pos) - int3(1, 1, 1);
+        globalPos = max(int3(0, 0, 0), globalPos);
+        globalPos = min(globalPos, int3(Resolution-1, Resolution-1, Resolution-1));
+        velCache[i] = VelocityRead[globalPos].xyz;
+    }
+
+    GroupMemoryBarrierWithGroupSync();
+    if (id.x >= Resolution || id.y >= Resolution || id.z >= Resolution) return;
+
+    uint3 pos = groupThreadId + uint3(1, 1, 1); // Offset for the padding
+
+    float3 vL = velCache[GetCacheIndex(uint3(pos + int3(-1,  0,  0)))];
+    float3 vR = velCache[GetCacheIndex(uint3(pos + int3( 1,  0,  0)))];
+    float3 vD = velCache[GetCacheIndex(uint3(pos + int3( 0, -1,  0)))];
+    float3 vU = velCache[GetCacheIndex(uint3(pos + int3( 0,  1,  0)))];
+    float3 vB = velCache[GetCacheIndex(uint3(pos + int3( 0,  0, -1)))];
+    float3 vF = velCache[GetCacheIndex(uint3(pos + int3( 0,  0,  1)))];
+
+    float dx = BoundsSize.x / float(Resolution);
+    float3 curl = float3(
+        (vU.z - vD.z) - (vF.y - vB.y),
+        (vF.x - vB.x) - (vR.z - vL.z),
+        (vR.y - vL.y) - (vU.x - vD.x)
+    ) / (2.0 * dx);
+    CurlWrite[id] = float4(curl, 0.0);
+}
+
+[numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
+void ExternalForces(
+    uint3 id : SV_DispatchThreadID,
+    uint3 groupId : SV_GroupID,
+    uint3 groupThreadId : SV_GroupThreadId,
+    uint groupIndex : SV_GroupIndex
+) {
+    [unroll]
+    for (uint i = groupIndex; i < TOTAL_CACHE; i += TOTAL_THREADS)
+    {
+        uint3 pos = GetCachePos(i);
+        int3 globalPos = int3(groupId * GROUP_SIZE) + int3(pos) - int3(1, 1, 1);
+        globalPos = max(int3(0, 0, 0), globalPos);
+        globalPos = min(globalPos, int3(Resolution-1, Resolution-1, Resolution-1));
+        vorticityCache[i] = length(CurlRead[globalPos].xyz);
+    }
+
+    GroupMemoryBarrierWithGroupSync();
+    if (id.x >= Resolution || id.y >= Resolution || id.z >= Resolution) return;
+
+    float3 vel = VelocityRead[id].xyz;
+    float4 smokeProp = SmokePropRead[id];
+
+    float heat = smokeProp.r;
+    float smokeDensity = smokeProp.g;
+
+    // Buoyancy
+    float buoyancyForce = (heat * Buoyancy) - (smokeDensity * SmokeWeight);
+    vel.y += buoyancyForce * DeltaTime;
+
+    // Vorticity Confinement
+    uint3 pos = groupThreadId + uint3(1, 1, 1); // Offset for the padding
+
+    float wL = vorticityCache[GetCacheIndex(uint3(pos + int3(-1,  0,  0)))];
+    float wR = vorticityCache[GetCacheIndex(uint3(pos + int3( 1,  0,  0)))];
+    float wD = vorticityCache[GetCacheIndex(uint3(pos + int3( 0, -1,  0)))];
+    float wU = vorticityCache[GetCacheIndex(uint3(pos + int3( 0,  1,  0)))];
+    float wB = vorticityCache[GetCacheIndex(uint3(pos + int3( 0,  0, -1)))];
+    float wF = vorticityCache[GetCacheIndex(uint3(pos + int3( 0,  0,  1)))];
+
+    float dx = BoundsSize.x / float(Resolution);
+    float3 eta = float3(wR - wL, wU - wD, wF - wB) / (2.0 * dx);
+
+    if (length(eta) > 0.001)
+    {
+        float3 N = normalize(eta);
+        float3 curl = CurlRead[id].xyz;
+
+        float3 vorticityForce = VorticityStrength * cross(N, curl) * dx;
+        vel += vorticityForce * DeltaTime;
+    }
+
+    VelocityWrite[id] = float4(vel, 0.0);
 }
 
 [numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
@@ -197,7 +302,7 @@ void Step(uint3 id : SV_DispatchThreadID)
     }
 
     // Temp diffusion (temp)
-    //advectedSmokeProps.r = max(0.0, advectedSmokeProps.r - (0.5 * DeltaTime));
+    advectedSmokeProps.r = max(0.0, advectedSmokeProps.r - (0.5 * DeltaTime));
     advectedSmokeProps.g = max(0.0, advectedSmokeProps.g - (1.5 * DeltaTime));
 
     SmokePropWrite[id] = advectedSmokeProps;
