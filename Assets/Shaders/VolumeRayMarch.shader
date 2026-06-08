@@ -63,8 +63,15 @@ Shader "Custom/VolumeRayMarch"
                 float _EmissionIntensity;
             CBUFFER_END
 
+            float random(float2 st)
+            {
+                // Canonical GPU random number generator
+                return frac(sin(dot(st.xy, float2(12.9898, 78.233))) * 43758.5453123);
+            }
+
             float noise3D(float3 x)
             {
+                // Don't ask me about this, blame Gemini (it does work though)
                 float3 p = floor(x);
                 float3 f = frac(x);
                 f = f * f * (3.0 - 2.0 * f);
@@ -128,12 +135,16 @@ Shader "Custom/VolumeRayMarch"
                 float3 rayDir = normalize(IN.localPos - IN.localCamPos);
                 float3 rayPos = IN.localPos + float3(0.5, 0.5, 0.5);
 
+                float jitter = random(IN.positionCS.xy) / 2;
+                rayPos += rayDir * (jitter * _StepSize);
+                IN.worldPos += normalize(IN.worldPos - GetCameraPositionWS()) * (jitter * _StepSize);
+
                 float4 finalColor = float4(0,0,0,0);
 
                 // _Time is a float4 in URP, .y is unscaled time
                 float3 noiseOffset = float3(0, -_Time.y * _NoiseSpeed, 0);
 
-                for (int step = 0; step < 64; step++)
+                for (int step = 0; step < 32; step++)
                 {
                     if (any(rayPos < 0) || any(rayPos > 1)) break;
 
