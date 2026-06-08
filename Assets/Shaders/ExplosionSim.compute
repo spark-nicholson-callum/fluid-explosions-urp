@@ -11,6 +11,15 @@
 #pragma kernel ProjectVelocity
 #pragma kernel Step
 
+struct Emitter
+{
+    float4x4 worldToLocal;
+    int shapeType;
+    float heat;
+    float density;
+    float expansion;
+};
+
 // r = heat, g = smoke density
 RWTexture3D<float4> VelocityWrite;
 Texture3D<float4> VelocityRead;
@@ -26,6 +35,9 @@ Texture3D<float> PressureRead;
 
 RWTexture3D<float4> SmokePropWrite;
 Texture3D<float4> SmokePropRead;
+
+StructuredBuffer<Emitter> Emitters;
+uint EmitterCount;
 
 SamplerState sampler_LinearClamp
 {
@@ -45,10 +57,7 @@ float3 BoundsSize;
 float SimScale;
 
 // Injection Data
-float3 InjectWorldPos;
-float InjectRadius;
 bool IsInjecting;
-float ExpansionForce;
 
 // Force Variables
 float Buoyancy;
@@ -61,6 +70,22 @@ float AmbientWindSpeed;
 groupshared float3 velCache[TOTAL_CACHE];
 groupshared float vorticityCache[TOTAL_CACHE];
 groupshared float pressureCache[TOTAL_CACHE];
+
+bool insideEmitter(Emitter em, float3 pos)
+{
+    float3 localPos = mul(em.worldToLocal, float4(pos, 1.0)).xyz;
+
+    // For each warp all emitter data is the same, so this is fine
+    [flatten]
+    switch (em.shapeType) {
+        case 0: // Sphere
+            return length(localPos) <= 0.5;
+        case 1:
+            return abs(localPos.x) <= 0.5 && abs(localPos.y) <= 0.5 && abs(localPos.z) <= 0.5;
+        default:
+            return false;
+    }
+}
 
 uint GetCacheIndex(uint3 pos)
 {
@@ -221,11 +246,20 @@ void ComputeDivergence(
     float dx = BoundsSize.x / float(Resolution);
     float div = ((vR.x - vL.x) + (vU.y - vD.y) + (vF.z - vB.z)) / (2.0 * dx);
 
-    float3 uvw = (float3(id) + 0.5) / float(Resolution);
-    float3 worldPos = BoundsMin + (uvw * BoundsSize);
-    if (IsInjecting && distance(worldPos, InjectWorldPos) < InjectRadius)
+    if (IsInjecting)
     {
-        div -= ExpansionForce;
+        // +.5 to sample the center of the the voxel
+        float3 uvw = (float3(id) + 0.5) / float(Resolution);
+        float3 worldPos = BoundsMin + (uvw * BoundsSize);
+        for (uint i = 0; i < EmitterCount; ++i)
+        {
+            Emitter em = Emitters[i];
+
+            if (insideEmitter(em, worldPos))
+            {
+                div -= em.expansion;
+            }
+        }
     }
 
     DivergenceWrite[id] = div;
@@ -305,8 +339,6 @@ void Step(uint3 id : SV_DispatchThreadID)
 {
     // +.5 to sample the center of the the voxel
     float3 uvw = ((float3(id) + 0.5) / float(Resolution));
-    float3 cellWorldPos = BoundsMin + (uvw * BoundsSize);
-
     float3 uvwVel = VelocityRead[id].xyz / BoundsSize;
     float3 prevUvw = uvw - (uvwVel * DeltaTime * SimScale);
 
@@ -316,10 +348,20 @@ void Step(uint3 id : SV_DispatchThreadID)
     // Temp dampening, air resistance should be a thing but we should be more precise
     advectedVel *= 0.99;
 
-    // TODO // Surely square distance is fine?
-    if (IsInjecting && distance(cellWorldPos, InjectWorldPos) < InjectRadius)
+    if (IsInjecting)
     {
-        advectedSmokeProps = float4(1.0, 1.0, 0.0, 0.0);
+        float3 cellWorldPos = BoundsMin + (uvw * BoundsSize);
+
+        for (uint i = 0; i < EmitterCount; ++i)
+        {
+            Emitter em = Emitters[i];
+
+            if (insideEmitter(em, cellWorldPos))
+            {
+                advectedSmokeProps.r = max(advectedSmokeProps.r, em.heat);
+                advectedSmokeProps.g = max(advectedSmokeProps.g, em.density);
+            }
+        }
     }
 
     // Temp diffusion (temp)

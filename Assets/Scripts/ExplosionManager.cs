@@ -1,5 +1,6 @@
-using UnityEngine;
+using System.Linq;
 using UnityEngine.InputSystem;
+using UnityEngine;
 
 public class ExplosionManager : MonoBehaviour
 {
@@ -12,9 +13,6 @@ public class ExplosionManager : MonoBehaviour
     [SerializeField] private ComputeShader fluidSimCompute;
     [SerializeField] private int resolution = 64;
     [SerializeField] private float simScale = 1.0f;
-    [SerializeField] private float injectRadius = 1.5f;
-    [SerializeField] private Transform injectionPoint = null;
-    [SerializeField] private float expansionForce = 50.0f;
     [SerializeField] private int pressureIterations = 40;
 
     [Header("Forces")]
@@ -37,6 +35,9 @@ public class ExplosionManager : MonoBehaviour
     private DoubleBuffer<RenderTexture> pressureTexture;
     private DoubleBuffer<RenderTexture> smokePropTexture;
     private Material rayMarchMaterial;
+
+    private ComputeBuffer emitterBuffer;
+    private EmitterData[] emitterData;
 
     private int initKernel;
     private int curlKernel;
@@ -63,11 +64,28 @@ public class ExplosionManager : MonoBehaviour
         fluidSimCompute.GetKernelThreadGroupSizes(initKernel, out groupSize, out _, out _);
         threadGroups = resolution / (int)groupSize;
 
+        // Create textures
         velocityTexture   = new(() => CreateVolume());
         curlTexture       = new(() => CreateVolume());
         divergenceTexture = new(() => CreateVolume(RenderTextureFormat.RHalf));
         pressureTexture   = new(() => CreateVolume(RenderTextureFormat.RHalf));
         smokePropTexture  = new(() => CreateVolume());
+
+        // Create buffers
+        FluidEmitter[] emitters = FindObjectsByType<FluidEmitter>();
+        fluidSimCompute.SetInt("EmitterCount", emitters.Length);
+        if (emitters.Length > 0)
+        {
+            emitterBuffer = new ComputeBuffer(emitters.Length, FluidEmitter.DataSize);
+            emitterData= emitters
+                .Select(x => x.GetEmitterData())
+                .ToArray();
+
+            emitterBuffer.SetData(emitterData);
+            fluidSimCompute.SetBuffer(stepKernel, "Emitters", emitterBuffer);
+            fluidSimCompute.SetBuffer(divergenceKernel, "Emitters", emitterBuffer);
+        }
+
         for (int i = 0; i < 2; ++i)
         {
             fluidSimCompute.SetTexture(initKernel, "VelocityWrite", velocityTexture.WriteBuffer);
@@ -110,12 +128,8 @@ public class ExplosionManager : MonoBehaviour
         fluidSimCompute.SetVector("BoundsSize", bounds.size);
 
         // Injection parameters
-        Vector3 injectPos = injectionPoint != null ? injectionPoint.position : transform.position;
         bool spacePressed = (Keyboard.current != null && Keyboard.current.spaceKey.isPressed);
         fluidSimCompute.SetBool("IsInjecting", spacePressed);
-        fluidSimCompute.SetVector("InjectWorldPos", injectPos);
-        fluidSimCompute.SetFloat("InjectRadius", injectRadius);
-        fluidSimCompute.SetFloat("ExpansionForce", expansionForce);
 
         // Advection Step
         fluidSimCompute.SetTexture(stepKernel, "SmokePropRead", smokePropTexture.ReadBuffer);
@@ -208,5 +222,6 @@ public class ExplosionManager : MonoBehaviour
         divergenceTexture.ForEach(t => {if (t != null) t.Release();});
         pressureTexture.ForEach(t => {if (t != null) t.Release();});
         velocityTexture.ForEach(t => {if (t != null) t.Release();});
+        if (emitterBuffer != null) emitterBuffer.Release();
     }
 }

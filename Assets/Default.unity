@@ -128,6 +128,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 209003762}
+  - component: {fileID: 209003763}
   m_Layer: 0
   m_Name: InjectTarget
   m_TagString: Untagged
@@ -144,12 +145,30 @@ Transform:
   m_GameObject: {fileID: 209003761}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.06, y: -0.36, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalPosition: {x: -0.03, y: -0.36, z: 0}
+  m_LocalScale: {x: 0.15, y: 0.15, z: 0.15}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 1025989860}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &209003763
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 209003761}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10e0193e3e11ab34a95c873d402f614f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FluidEmitter
+  shape: 0
+  density: 1
+  heat: 1
+  expansion: 35
+  drawGizmo: 1
+  gizmoColor: {r: 0.121568635, g: 0.7058824, b: 0.72156864, a: 0.5019608}
 --- !u!1 &312765081
 GameObject:
   m_ObjectHideFlags: 0
@@ -384,11 +403,11 @@ Transform:
   m_GameObject: {fileID: 650312461}
   serializedVersion: 2
   m_LocalRotation: {x: -0.7071067, y: 0.000000037252903, z: 0.00000003141026, w: 0.70710695}
-  m_LocalPosition: {x: 0, y: 0.05, z: -1.6999998}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalPosition: {x: 0, y: 0.0071428567, z: -0.59285706}
+  m_LocalScale: {x: 0.14285713, y: 0.14285712, z: 0.14285712}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 1025989860}
   m_LocalEulerAnglesHint: {x: -90, y: 0, z: 0}
 --- !u!1 &1025989855
 GameObject:
@@ -425,11 +444,8 @@ MonoBehaviour:
   fluidSimCompute: {fileID: 7200000, guid: e216cbea8501e1f4a88c169fe10897d9, type: 3}
   resolution: 64
   simScale: 1
-  injectRadius: 0.4
-  injectionPoint: {fileID: 209003762}
-  expansionForce: 80
   pressureIterations: 40
-  buoyancyStrength: 45
+  buoyancyStrength: 40
   smokeWeight: 4
   vorticityStrength: 25
   ambientWindScale: 1.4
@@ -530,6 +546,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 209003762}
+  - {fileID: 650312465}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1378634469
@@ -676,4 +693,3 @@ SceneRoots:
   - {fileID: 1378634472}
   - {fileID: 312765083}
   - {fileID: 1025989860}
-  - {fileID: 650312465}
