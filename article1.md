@@ -138,7 +138,7 @@ $$
 この条件を守るための圧力はポアソン方程式で計算します。
 
 $$
-\nabla^2 p = \nabla \cdot \bold{p}
+\nabla^2 p = \nabla \cdot \bold{u}
 $$
 
 これは一発で計算できないやつなので、何回も反復して正しい圧力に近づけていくしかないです。
@@ -161,5 +161,5 @@ $$
 
 圧力のほうがポアソン方程式で計算します
 $$
-\nabla^2 p = \nabla \cdot \bold{p}
+\nabla^2 p = \nabla \cdot \bold{u}
 $$
