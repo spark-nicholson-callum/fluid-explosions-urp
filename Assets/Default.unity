@@ -164,6 +164,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FluidEmitter
   shape: 0
+  velocity: {x: 0, y: 0, z: 0}
   density: 0
   heat: 1
   fuel: 0
@@ -215,6 +216,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FluidEmitter
   shape: 0
+  velocity: {x: 0, y: 0, z: 0}
   density: 1
   heat: 1
   fuel: 0
@@ -266,6 +268,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FluidEmitter
   shape: 0
+  velocity: {x: 0, y: 0, z: 0}
   density: 1
   heat: 1
   fuel: 0
@@ -641,7 +644,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &546451238
 Transform:
   m_ObjectHideFlags: 0
@@ -670,6 +673,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FluidEmitter
   shape: 0
+  velocity: {x: 0, y: 0, z: 0}
   density: 0
   heat: 1
   fuel: 0
@@ -808,7 +812,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &710290807
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -835,7 +839,10 @@ MonoBehaviour:
   smokeEmission: 8
   heatEmission: 6
   burnExpansion: 4000
+  thermalExpansion: 0.1
+  reactionExpansion: 2
   smokeChoke: 10
+  thermalDecay: 0.4
   debugMode: 0
   debugQuad: {fileID: 358543287}
   zSlice: 0.5
@@ -981,6 +988,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FluidEmitter
   shape: 1
+  velocity: {x: 0, y: 0, z: 0}
   density: 0
   heat: 0
   fuel: 0.4
@@ -1032,6 +1040,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FluidEmitter
   shape: 1
+  velocity: {x: 0, y: 0, z: 0}
   density: 0
   heat: 0
   fuel: 0.4
@@ -1197,7 +1206,10 @@ MonoBehaviour:
   smokeEmission: 2
   heatEmission: 5
   burnExpansion: 50
+  thermalExpansion: 0.1
+  reactionExpansion: 2
   smokeChoke: 10
+  thermalDecay: 0.4
   debugMode: 0
   debugQuad: {fileID: 1126455083}
   zSlice: 0.5
@@ -1343,7 +1355,10 @@ MonoBehaviour:
   smokeEmission: 2
   heatEmission: 5
   burnExpansion: 50
+  thermalExpansion: 0.1
+  reactionExpansion: 2
   smokeChoke: 10
+  thermalDecay: 0.4
   debugMode: 0
   debugQuad: {fileID: 845916033}
   zSlice: 0.5
@@ -1490,7 +1505,10 @@ MonoBehaviour:
   smokeEmission: 2
   heatEmission: 5
   burnExpansion: 50
+  thermalExpansion: 0.1
+  reactionExpansion: 2
   smokeChoke: 10
+  thermalDecay: 0.4
   debugMode: 0
   debugQuad: {fileID: 650312463}
   zSlice: 0.5
@@ -1719,7 +1737,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &1128687595
 Transform:
   m_ObjectHideFlags: 0
@@ -1730,7 +1748,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: -0.475, z: 0}
-  m_LocalScale: {x: 0.5, y: 0.05, z: 0.5}
+  m_LocalScale: {x: 0.3, y: 0.03, z: 0.3}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 710290811}
@@ -1748,10 +1766,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FluidEmitter
   shape: 1
+  velocity: {x: 0, y: 5, z: 0}
   density: 0
   heat: 0
   fuel: 0.4
-  expansion: 20
+  expansion: 5
   drawGizmo: 1
   gizmoColor: {r: 0.121568635, g: 0.7058824, b: 0.72156864, a: 0.5019608}
 --- !u!1 &1146687681
@@ -1800,7 +1819,10 @@ MonoBehaviour:
   smokeEmission: 2
   heatEmission: 5
   burnExpansion: 50
+  thermalExpansion: 0.1
+  reactionExpansion: 2
   smokeChoke: 10
+  thermalDecay: 0.4
   debugMode: 0
   debugQuad: {fileID: 1629574680}
   zSlice: 0.5
@@ -1946,6 +1968,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FluidEmitter
   shape: 1
+  velocity: {x: 0, y: 0, z: 0}
   density: 0
   heat: 0
   fuel: 0
@@ -2039,7 +2062,7 @@ Transform:
   m_GameObject: {fileID: 1378634469}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.05, z: -9.7}
+  m_LocalPosition: {x: 0, y: 0, z: -5.51}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2134,6 +2157,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FluidEmitter
   shape: 0
+  velocity: {x: 0, y: 0, z: 0}
   density: 0
   heat: 0.5
   fuel: 0.4
@@ -2185,6 +2209,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FluidEmitter
   shape: 1
+  velocity: {x: 0, y: 0, z: 0}
   density: 0
   heat: 1
   fuel: 0
@@ -2323,7 +2348,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1630588563
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2350,7 +2375,10 @@ MonoBehaviour:
   smokeEmission: 8
   heatEmission: 6
   burnExpansion: 4000
+  thermalExpansion: 0.1
+  reactionExpansion: 2
   smokeChoke: 10
+  thermalDecay: 0.4
   debugMode: 0
   debugQuad: {fileID: 1805367868}
   zSlice: 0.5
@@ -2496,6 +2524,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FluidEmitter
   shape: 0
+  velocity: {x: 0, y: 0, z: 0}
   density: 1
   heat: 0.2
   fuel: 0
@@ -2661,7 +2690,10 @@ MonoBehaviour:
   smokeEmission: 8
   heatEmission: 6
   burnExpansion: 4000
+  thermalExpansion: 0.1
+  reactionExpansion: 2
   smokeChoke: 10
+  thermalDecay: 0.4
   debugMode: 0
   debugQuad: {fileID: 460957307}
   zSlice: 0.5
@@ -2807,6 +2839,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FluidEmitter
   shape: 0
+  velocity: {x: 0, y: 0, z: 0}
   density: 1
   heat: 0.1
   fuel: 0

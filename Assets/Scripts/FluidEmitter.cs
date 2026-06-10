@@ -4,14 +4,11 @@ public struct EmitterData
 {
     public Matrix4x4 worldToLocal;  // 64 bytes
     public int shapeType;           // 4 bytes
+    public Vector3 velocity;        // 12 bytes
     public float heat;              // 4 bytes
     public float density;           // 4 bytes
     public float fuel;              // 4 bytes
     public float expansion;         // 4 bytes
-
-    public float padding1;          // 4 bytes
-    public float padding2;          // 4 bytes
-    public float padding3;          // 4 bytes
     // = 96 bytes = 6 * 16 bytes
 }
 
@@ -27,6 +24,7 @@ public class FluidEmitter : MonoBehaviour
     [SerializeField] private Shape shape;
 
     [Header("Emission Data")]
+    [SerializeField] private Vector3 velocity = Vector3.zero;
     [SerializeField] private float density = 1.0f;
     [SerializeField] private float heat = 1.0f;
     [SerializeField] private float fuel = 0.0f;
@@ -44,6 +42,7 @@ public class FluidEmitter : MonoBehaviour
         {
             worldToLocal = transform.worldToLocalMatrix,
             shapeType = (int)shape,
+            velocity = velocity,
             density = density,
             heat = heat,
             fuel = fuel,

@@ -15,12 +15,11 @@ struct Emitter
 {
     float4x4 worldToLocal;
     int shapeType;
+    float3 velocity;
     float heat;
     float density;
     float fuel;
     float expansion;
-
-    float padding[3];
 };
 
 // r = heat, g = smoke density, b = fuel, a = reaction
@@ -397,6 +396,8 @@ void Step(uint3 id : SV_DispatchThreadID)
                 advectedSmokeProps.r = max(advectedSmokeProps.r, em.heat);
                 advectedSmokeProps.g = max(advectedSmokeProps.g, em.density);
                 advectedSmokeProps.b = max(advectedSmokeProps.b, em.fuel);
+
+                advectedVel.xyz = em.velocity;
             }
         }
     }
