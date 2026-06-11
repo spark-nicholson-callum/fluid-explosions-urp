@@ -53,6 +53,9 @@ public class ExplosionManager : MonoBehaviour
     private ComputeBuffer emitterBuffer;
     private EmitterData[] emitterData;
 
+    private ComputeBuffer particleBuffer;
+    private ParticleFluidData[] particleData;
+
     private int initKernel;
     private int curlKernel;
     private int externalForcesKernel;
@@ -130,12 +133,12 @@ public class ExplosionManager : MonoBehaviour
         fluidSimCompute.SetVector("BoundsMin", bounds.min);
         fluidSimCompute.SetVector("BoundsSize", bounds.size);
 
-        // Injection parameters / Emitters
+        // Emitters
         bool spacePressed = (Keyboard.current != null && Keyboard.current.spaceKey.isPressed);
         spacePressed = true;
         fluidSimCompute.SetBool("IsInjecting", spacePressed);
 
-        FluidEmitter[] emitters = transform.GetComponentsInChildren<FluidEmitter>(includeInactive: false);
+        FluidEmitter[] emitters = transform.GetComponentsInChildren<FluidEmitter>();
         fluidSimCompute.SetInt("EmitterCount", emitters.Length);
         if (emitters.Length > 0)
         {
@@ -149,14 +152,50 @@ public class ExplosionManager : MonoBehaviour
                 emitterBuffer = new ComputeBuffer(emitters.Length, FluidEmitter.DataSize);
             }
 
-            emitterData= emitters
+            emitterData = emitters
                 .Select(x => x.GetEmitterData())
                 .ToArray();
 
             emitterBuffer.SetData(emitterData);
-            fluidSimCompute.SetBuffer(stepKernel, "Emitters", emitterBuffer);
-            fluidSimCompute.SetBuffer(divergenceKernel, "Emitters", emitterBuffer);
         }
+        else
+        {
+            if (emitterBuffer == null)
+            {
+                emitterBuffer = new ComputeBuffer(1, FluidEmitter.DataSize);
+            }
+            emitterBuffer.SetData(new EmitterData[] {});
+        }
+        fluidSimCompute.SetBuffer(stepKernel, "Emitters", emitterBuffer);
+        fluidSimCompute.SetBuffer(divergenceKernel, "Emitters", emitterBuffer);
+
+        // Particles
+        ParticleFluidData[] particles = transform.GetComponentsInChildren<FluidParticleBridge>()
+            .SelectMany(p => p.FluidData)
+            .ToArray();
+        fluidSimCompute.SetInt("ParticleCount", particles.Length);
+        if (particles.Length > 0)
+        {
+            if (particleBuffer != null && particleBuffer.count != particles.Length)
+            {
+                particleBuffer.Release();
+                particleBuffer = null;
+            }
+            if (particleBuffer == null)
+            {
+                particleBuffer = new ComputeBuffer(particles.Length, FluidParticleBridge.DataSize);
+            }
+            particleBuffer.SetData(particles);
+        }
+        else
+        {
+            if (particleBuffer == null)
+            {
+                particleBuffer = new ComputeBuffer(1, FluidParticleBridge.DataSize);
+            }
+            particleBuffer.SetData(new ParticleFluidData[] {});
+        }
+        fluidSimCompute.SetBuffer(stepKernel, "Particles", particleBuffer);
 
         // Advection Step
         fluidSimCompute.SetTexture(stepKernel, "SmokePropRead", smokePropTexture.ReadBuffer);
@@ -262,5 +301,6 @@ public class ExplosionManager : MonoBehaviour
         pressureTexture.ForEach(t => {if (t != null) t.Release();});
         velocityTexture.ForEach(t => {if (t != null) t.Release();});
         if (emitterBuffer != null) emitterBuffer.Release();
+        if (particleBuffer != null) particleBuffer.Release();
     }
 }

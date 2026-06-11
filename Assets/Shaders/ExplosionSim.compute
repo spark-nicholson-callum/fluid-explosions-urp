@@ -22,6 +22,18 @@ struct Emitter
     float expansion;
 };
 
+struct Particle
+{
+    float3 position;
+    float radius;
+    float3 velocity;
+    float heat;
+    float density;
+    float fuel;
+
+    float2 padding;
+};
+
 // r = heat, g = smoke density, b = fuel, a = reaction
 RWTexture3D<float4> VelocityWrite;
 Texture3D<float4> VelocityRead;
@@ -40,6 +52,9 @@ Texture3D<float4> SmokePropRead;
 
 StructuredBuffer<Emitter> Emitters;
 uint EmitterCount;
+
+StructuredBuffer<Particle> Particles;
+uint ParticleCount;
 
 SamplerState sampler_LinearClamp
 {
@@ -100,6 +115,11 @@ bool insideEmitter(Emitter em, float3 pos)
         default:
             return false;
     }
+}
+
+bool insideParticle(Particle p, float3 pos)
+{
+    return length(pos - p.position) <= p.radius;
 }
 
 uint GetCacheIndex(uint3 pos)
@@ -398,6 +418,19 @@ void Step(uint3 id : SV_DispatchThreadID)
                 advectedSmokeProps.b = max(advectedSmokeProps.b, em.fuel);
 
                 advectedVel.xyz = em.velocity;
+            }
+        }
+
+        for (uint j = 0; j < ParticleCount; ++j)
+        {
+            Particle p = Particles[j];
+            if (insideParticle(p, cellWorldPos))
+            {
+                advectedSmokeProps.r = max(advectedSmokeProps.r, p.heat);
+                advectedSmokeProps.g = max(advectedSmokeProps.g, p.density);
+                advectedSmokeProps.b = max(advectedSmokeProps.b, p.fuel);
+
+                advectedVel.xyz = p.velocity;
             }
         }
     }
