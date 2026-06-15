@@ -16740,7 +16740,7 @@ MonoBehaviour:
   reactionExpansion: 1.5
   smokeChoke: 20
   thermalDecay: 2
-  mainLight: {fileID: 0}
+  mainLight: {fileID: 312765082}
   shadowStepSize: 0.05
   shadowAbsorption: 5
   shadowSteps: 16
@@ -28963,7 +28963,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: d6ce069e8329f2342af1a7cc595f598c, type: 2}
+  - {fileID: 2100000, guid: e12927b399037ee4dba544bee8fb46e7, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0

@@ -127,10 +127,7 @@ Shader "Custom/SurfaceExplosionMarch"
                 color.g = saturate(0.3900815788 * log(temp) - 0.6318414438);
                 color.b = (temp <= 19) ? 0.0 : saturate(0.5432067891 * log(temp - 10) - 1.1962540891);
 
-                float alpha = saturate(heat * heat * _EmissionIntensity);
-                color = lerp(_SmokeAlbedo, color, alpha);
-
-                return color;
+                return color * heat * heat * _EmissionIntensity;
             }
 
             Varyings vert(Attributes IN)
@@ -178,9 +175,10 @@ Shader "Custom/SurfaceExplosionMarch"
                     {
                         float3 noiseSamplePos = (IN.worldPos * _NoiseScale) + noiseOffset;
                         float noiseVal = fbm(noiseSamplePos);
-                        float erodedDensity = saturate(baseDensity - (noiseVal * _NoiseStrength * (1.0 - baseDensity)));
+                        float heatErrosion = heat * 0.02;
+                        float erodedDensity = saturate(baseDensity - heatErrosion - (noiseVal * _NoiseStrength * (1.0 - baseDensity)));
 
-                        if (erodedDensity > 0.01)
+                        if (erodedDensity > 0.1)
                         {
                             float lightTransmission = SAMPLE_TEXTURE3D(_ShadowTex, sampler_VolumeTex, rayPos).r;
 

@@ -34,7 +34,7 @@ Material:
     m_Ints: []
     m_Floats:
     - _EmissionIntensity: 10
-    - _MaxTemperature: 25
+    - _MaxTemperature: 30
     - _MinTemperature: 10
     - _NoiseScale: 10
     - _NoiseSpeed: 0.5

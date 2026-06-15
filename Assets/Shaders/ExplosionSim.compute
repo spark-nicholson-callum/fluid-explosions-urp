@@ -520,6 +520,7 @@ void CalculateShadows(uint3 id : SV_DispatchThreadID)
             break;
 
         float density = SmokePropRead.SampleLevel(sampler_LinearClamp, rayPos, 0).g;
+        density = density < 0.1 ? 0.0 : density;
         totalDensity += density;
     }
 
