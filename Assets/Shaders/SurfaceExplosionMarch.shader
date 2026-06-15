@@ -106,7 +106,7 @@ Shader "Custom/SurfaceExplosionMarch"
             {
                 float f = 0.0;
                 float amp = 0.5;
-                for(int i = 0; i < 3; i++)
+                for(int i = 0; i < 4; i++)
                 {
                     f += amp * noise3D(p);
                     p *= 2.0;
@@ -127,7 +127,8 @@ Shader "Custom/SurfaceExplosionMarch"
                 color.g = saturate(0.3900815788 * log(temp) - 0.6318414438);
                 color.b = (temp <= 19) ? 0.0 : saturate(0.5432067891 * log(temp - 10) - 1.1962540891);
 
-                color = color * heat * heat * _EmissionIntensity;
+                float alpha = saturate(heat * heat * _EmissionIntensity);
+                color = lerp(_SmokeAlbedo, color, alpha);
 
                 return color;
             }
@@ -169,7 +170,7 @@ Shader "Custom/SurfaceExplosionMarch"
                     float thresh = _MinTemperature / _MaxTemperature;
                     if (heat > thresh)
                     {
-                        finalColor = float4(blackbodyColor(heat) + _AmbientColor, 1.0);
+                        finalColor = float4(blackbodyColor(heat), 1.0);
                         break;
                     }
 
@@ -179,9 +180,9 @@ Shader "Custom/SurfaceExplosionMarch"
                         float noiseVal = fbm(noiseSamplePos);
                         float erodedDensity = saturate(baseDensity - (noiseVal * _NoiseStrength * (1.0 - baseDensity)));
 
-                        if (erodedDensity > 0.1)
+                        if (erodedDensity > 0.01)
                         {
-                            float lightTransmission = 6.0 * SAMPLE_TEXTURE3D(_ShadowTex, sampler_VolumeTex, rayPos).r;
+                            float lightTransmission = SAMPLE_TEXTURE3D(_ShadowTex, sampler_VolumeTex, rayPos).r;
 
                             float3 directLight = _SmokeMainLightColor.rgb * lightTransmission;
                             float3 totalLight  = directLight + _AmbientColor.rgb;

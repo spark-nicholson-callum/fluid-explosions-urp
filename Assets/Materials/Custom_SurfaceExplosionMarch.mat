@@ -34,15 +34,15 @@ Material:
     m_Ints: []
     m_Floats:
     - _EmissionIntensity: 10
-    - _MaxTemperature: 30
+    - _MaxTemperature: 25
     - _MinTemperature: 10
     - _NoiseScale: 10
     - _NoiseSpeed: 0.5
-    - _NoiseStrength: 1
+    - _NoiseStrength: 0.33
     - _StepSize: 0.02
     m_Colors:
     - _AmbientColor: {r: 0.14999998, g: 0.19999996, b: 0.24999997, a: 1}
-    - _SmokeAlbedo: {r: 0.8, g: 0.8, b: 0.8, a: 1}
+    - _SmokeAlbedo: {r: 0.396, g: 0.396, b: 0.396, a: 1}
     - _SmokeMainLightColor: {r: 1, g: 0.95, b: 0.9, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

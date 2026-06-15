@@ -298,6 +298,7 @@ public class ExplosionManager : MonoBehaviour
 
         // Share result with ray march material for rendering
         rayMarchMaterial.SetTexture("_VolumeTex", smokePropTexture.ReadBuffer);
+        rayMarchMaterial.SetTexture("_ShadowTex", shadowTexture);
 
         DrawDebug();
     }
