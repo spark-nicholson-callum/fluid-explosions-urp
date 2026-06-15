@@ -1,4 +1,4 @@
-Shader "Custom/VolumeRayMarch"
+Shader "Custom/CloudExplosionMarch"
 {
     Properties
     {
@@ -150,7 +150,7 @@ Shader "Custom/VolumeRayMarch"
 
                 float jitter = random(IN.positionCS.xy * _Time.y);
                 rayPos += rayDir * (jitter * _StepSize);
-                IN.worldPos += normalize(IN.worldPos - GetCameraPositionWS()) * (jitter * _StepSize);
+                IN.worldPos += normalize(IN.worldPos - GetCameraPositionWS()) * (jitter + _StepSize);
 
                 float3 finalColor = float3(0.0, 0.0, 0.0);
 
