@@ -406,10 +406,31 @@ void Step(uint3 id : SV_DispatchThreadID)
     // +.5 to sample the center of the the voxel
     float3 uvw = ((float3(id) + 0.5) / float(Resolution));
     float3 uvwVel = VelocityRead[id].xyz / BoundsSize;
-    float3 prevUvw = uvw - (uvwVel * DeltaTime * SimScale);
+
+    // MacCormack Advection
+    float3 backUvw = uvw - (uvwVel * DeltaTime * SimScale);
+    float3 backVel = VelocityRead.SampleLevel(sampler_LinearClamp, backUvw, 0).xyz;
+
+    float3 forwardUvw = backUvw + (backVel * DeltaTime * SimScale);
+    float3 prevUvw = backUvw + (uvw - forwardUvw) / 2.0;
 
     float4 advectedSmokeProps = SmokePropRead.SampleLevel(sampler_LinearClamp, prevUvw, 0);
-    float4 advectedVel = VelocityRead.SampleLevel(sampler_LinearClamp, prevUvw, 0);
+    float4 advectedVel = VelocityRead.SampleLevel(sampler_LinearClamp, backUvw, 0);
+
+    // Clamp to neighborhood values of regular semi-lagrangian result
+    float off = 1.0 / float(Resolution);
+    float4 sM = SmokePropRead.SampleLevel(sampler_LinearClamp, backUvw, 0);
+    float4 sL = SmokePropRead.SampleLevel(sampler_LinearClamp, backUvw + float3(-off, 0.0, 0.0), 0);
+    float4 sR = SmokePropRead.SampleLevel(sampler_LinearClamp, backUvw + float3( off, 0.0, 0.0), 0);
+    float4 sB = SmokePropRead.SampleLevel(sampler_LinearClamp, backUvw + float3(0.0, -off, 0.0), 0);
+    float4 sF = SmokePropRead.SampleLevel(sampler_LinearClamp, backUvw + float3(0.0,  off, 0.0), 0);
+    float4 sD = SmokePropRead.SampleLevel(sampler_LinearClamp, backUvw + float3(0.0, 0.0, -off), 0);
+    float4 sU = SmokePropRead.SampleLevel(sampler_LinearClamp, backUvw + float3(0.0, 0.0,  off), 0);
+
+    float4 minSmokeProps = min(sM, min(min(sL, sR), min(min(sB, sF), min(sD, sU))));
+    float4 maxSmokeProps = max(sM, max(max(sL, sR), max(max(sB, sF), max(sD, sU))));
+
+    advectedSmokeProps = clamp(advectedSmokeProps, minSmokeProps, maxSmokeProps);
 
     // Temp dampening, air resistance should be a thing but we should be more precise
     advectedVel *= 0.99;
@@ -473,7 +494,7 @@ void Step(uint3 id : SV_DispatchThreadID)
     heat = advectedSmokeProps.r;
     smoke = advectedSmokeProps.g;
     advectedSmokeProps.r = max(0.0, heat - (ThermalDecay * heat * heat * DeltaTime));
-    advectedSmokeProps.g = max(0.0, smoke - (0.2 * smoke * DeltaTime));
+    advectedSmokeProps.g = max(0.0, smoke - (0.5 * smoke * DeltaTime));
 
     SmokePropWrite[id] = advectedSmokeProps;
     VelocityWrite[id] = advectedVel;
