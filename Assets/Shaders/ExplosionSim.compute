@@ -409,13 +409,13 @@ void Step(uint3 id : SV_DispatchThreadID)
 
     // MacCormack Advection
     float3 backUvw = uvw - (uvwVel * DeltaTime * SimScale);
-    float3 backVel = VelocityRead.SampleLevel(sampler_LinearClamp, backUvw, 0).xyz;
+    float4 backVel = VelocityRead.SampleLevel(sampler_LinearClamp, backUvw, 0);
 
-    float3 forwardUvw = backUvw + (backVel * DeltaTime * SimScale);
+    float3 forwardUvw = backUvw + (backVel.xyz * DeltaTime * SimScale);
     float3 prevUvw = backUvw + (uvw - forwardUvw) / 2.0;
 
     float4 advectedSmokeProps = SmokePropRead.SampleLevel(sampler_LinearClamp, prevUvw, 0);
-    float4 advectedVel = VelocityRead.SampleLevel(sampler_LinearClamp, backUvw, 0);
+    float4 advectedVel = backVel;
 
     // Clamp to neighborhood values of regular semi-lagrangian result
     float off = 1.0 / float(Resolution);

@@ -16733,7 +16733,7 @@ MonoBehaviour:
   ambientWindSpeed: 0.5
   ignitionTemp: 0.5
   burnRate: 4
-  smokeEmission: 4
+  smokeEmission: 5
   heatEmission: 6
   burnExpansion: 200
   thermalExpansion: 0.22

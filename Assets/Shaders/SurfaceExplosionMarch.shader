@@ -20,6 +20,10 @@ Shader "Custom/SurfaceExplosionMarch"
         _MinTemperature ("Minimum Temperature", Float) = 10.0
         _MaxTemperature ("Maximum Temperature", Float) = 30.0
         _EmissionIntensity ("Emission Intensity", Float) = 10.0
+
+        [Header(Surface Render Settings)]
+        _FireSurfaceDepth ("Fire Surface Depth", Float) = 1.0
+        _SmokeDensityCutoff("Smoke Density Cutoff", Float) = 0.1
     }
     SubShader
     {
@@ -72,6 +76,9 @@ Shader "Custom/SurfaceExplosionMarch"
                 float4 _SmokeMainLightColor;
                 float4 _AmbientColor;
                 float4 _SmokeAlbedo;
+
+                float _FireSurfaceDepth;
+                float _SmokeDensityCutoff;
             CBUFFER_END
 
             float random(float2 st)
@@ -175,8 +182,7 @@ Shader "Custom/SurfaceExplosionMarch"
                         float3 surfPos = lerp(prevRayPos, rayPos, fraction);
 
                         // Sample below the surface
-                        // TODO // Make the sample depth a parameter
-                        float3 samplePos = saturate(surfPos + (rayDir * (_StepSize * 1)));
+                        float3 samplePos = saturate(surfPos + (rayDir * (_StepSize * _FireSurfaceDepth)));
                         float sampleHeat = SAMPLE_TEXTURE3D(_VolumeTex, sampler_VolumeTex, samplePos).r;
 
                         finalColor = float4(blackbodyColor(sampleHeat), 1.0);
@@ -188,8 +194,7 @@ Shader "Custom/SurfaceExplosionMarch"
                     float heatErrosion = heat * 0.02;
                     float erodedDensity = saturate(baseDensity - heatErrosion - (noiseVal * _NoiseStrength * (1.0 - baseDensity)));
 
-                    // TODO // Make the cutoff a parameter
-                    if (erodedDensity > 0.1)
+                    if (erodedDensity > _SmokeDensityCutoff)
                     {
                         float lightTransmission = SAMPLE_TEXTURE3D(_ShadowTex, sampler_VolumeTex, rayPos).r;
 
