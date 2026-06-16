@@ -236,6 +236,92 @@ if (length(eta) > 0.001)
 }
 ```
 
+## レイマーチングシェーダ
+HDRP や UE5 と違って、URP はボリュームテクスチャの描画がないため、自分で作る必要です。
+まあ、想像より簡単なものでしょうけどね。基本的にボリュームをスライスして、重ねて描画します。
+問題はこれは木目の模様みたいにスライスの破片がすごく目立つため、何とか3次元でブレンドする必要です。
+
+### 基本の処理
+まず、フラグメントとカメラの位置を使って方向のベクトルを取得します。
+その方向にマーチングします。
+
+かくステップがさらに深くボリュームに張りますので、今までの色が新しいスライスの上に描画するイメージです。
+その想定でブレンドしたら問題なく、簡単にボリュームを描けます。
+
+```hlsl
+float3 rayDir = normalize(IN.localPos - IN.localCamPos);
+float3 rayPos = IN.localPos + float3(0.5, 0.5, 0.5);
+
+float3 finalColor = float3(0.0, 0.0, 0.0);
+
+float transparency = 1.0;
+for (int step = 0; step < 32; step++)
+{
+    if (any(rayPos < 0) || any(rayPos > 1)) break;
+    if (transparency < 0.01) break;
+
+    float4 volumeData = SAMPLE_TEXTURE3D(_VolumeTex, sampler_VolumeTex, rayPos);
+
+    // volumeData の熱と煙の量などの値を使ってこのステップの色を計算します
+    float3 voxelColor = calculateColor(volumeData);
+    float  voxelAlpha = calculateAlpha(volumeData);
+
+    // transparency = 1 - alpha のでこれは乗算済みアルファで alpha:1-alpha のブレンド
+    finalColor += voxelColor * voxelAlpha * transparency;
+    transparency *= 1.0 - voxelAlpha
+
+    rayPos += rayDir * _StepSize;
+}
+
+return float4(finalColor, 1.0 - transparency);
+```
+
+### 色の計算：黒体放射
+あったかい物が光を放射します、これは黒体放射と言います、炎も同じです。
+炎が複雑の物ですが、基本的に炭素がすごく厚くなって光らせています。
+
+本当の計算が複雑すぎので [Tanner Helland の概算](https://tannerhelland.com/2012/09/18/convert-temperature-rgb-algorithm-code.html)を使います
+
+```hlsl
+float3 blackbodyColor(float heat)
+{
+    // Tanner Helland approximation for < 6600K
+    float temp = lerp(_MinTemperature, _MaxTemperature, heat);
+    float3 color;
+    color.r = 1.0;
+    color.g = saturate(0.3900815788 * log(temp) - 0.6318414438);
+    color.b = (temp <= 19) ? 0.0 : saturate(0.5432067891 * log(temp - 10) - 1.1962540891);
+
+    color = color * heat * heat * _EmissionIntensity;
+
+    return color;
+}
+```
+
+### ジッターについて
+ここまではスライスごとで描画していますが、スライスとスライスの間をブレンドしてちゃんとした3次元のもので表示が必要です。
+これも意外と簡単です、かくレイの位置をランダムにずらして計算する。
+これだけだとノイズがすごくひどくなりますが、フレームごとに別の位置を選ぶので単なるの TAA でかなりなめらかに描画できます。
+
+#### GPU の RNG
+これがよくみる GPU の RNG 関数です
+```
+float random(float2 st)
+{
+    return frac(sin(dot(st.xy, float2(12.9898, 78.233))) * 43758.5453123);
+}
+```
+とっても分かりにくいやつでしょうね。でもちゃんとした [0, 1) のランダム数になります。
+大きい数字だと GPU の三角関数がかなり正確ではない、大体ランダムになります。
+
+#### ジッターの実装
+本当に rayDir にちょっとずらすだけです
+```
+float jitter = random(IN.positionCS.xy + _Time.y);
+rayPos += rayDir * (jitter * _StepSize);
+IN.worldPos += normalize(IN.worldPos - GetCameraPositionWS()) * (jitter + _StepSize);
+```
+
 ## 最低限の流体力学
 
 ### Navier-Stokes
