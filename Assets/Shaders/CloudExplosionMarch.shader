@@ -148,7 +148,7 @@ Shader "Custom/CloudExplosionMarch"
                 float3 rayDir = normalize(IN.localPos - IN.localCamPos);
                 float3 rayPos = IN.localPos + float3(0.5, 0.5, 0.5);
 
-                float jitter = random(IN.positionCS.xy * _Time.y);
+                float jitter = random(IN.positionCS.xy + _Time.y);
                 rayPos += rayDir * (jitter * _StepSize);
                 IN.worldPos += normalize(IN.worldPos - GetCameraPositionWS()) * (jitter + _StepSize);
 

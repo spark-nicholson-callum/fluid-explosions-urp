@@ -70,7 +70,7 @@ SamplerState sampler_LinearClamp
 
 float Time;
 float DeltaTime;
-uint Resolution;
+uint3 Resolution;
 
 // World Space
 float3 BoundsMin;
@@ -169,12 +169,12 @@ void ComputeCurl(
         uint3 pos = GetCachePos(i);
         int3 globalPos = int3(groupId * GROUP_SIZE) + int3(pos) - int3(1, 1, 1);
         globalPos = max(int3(0, 0, 0), globalPos);
-        globalPos = min(globalPos, int3(Resolution-1, Resolution-1, Resolution-1));
+        globalPos = min(globalPos, int3(Resolution-1));
         velCache[i] = VelocityRead[globalPos].xyz;
     }
 
     GroupMemoryBarrierWithGroupSync();
-    if (id.x >= Resolution || id.y >= Resolution || id.z >= Resolution) return;
+    if (any(id >= Resolution)) return;
 
     uint3 pos = groupThreadId + uint3(1, 1, 1); // Offset for the padding
 
@@ -185,7 +185,7 @@ void ComputeCurl(
     float3 vB = velCache[GetCacheIndex(uint3(pos + int3( 0,  0, -1)))];
     float3 vF = velCache[GetCacheIndex(uint3(pos + int3( 0,  0,  1)))];
 
-    float dx = BoundsSize.x / float(Resolution);
+    float dx = BoundsSize.x / float(Resolution.x);
     float3 curl = float3(
         (vU.z - vD.z) - (vF.y - vB.y),
         (vF.x - vB.x) - (vR.z - vL.z),
@@ -207,12 +207,12 @@ void ExternalForces(
         uint3 pos = GetCachePos(i);
         int3 globalPos = int3(groupId * GROUP_SIZE) + int3(pos) - int3(1, 1, 1);
         globalPos = max(int3(0, 0, 0), globalPos);
-        globalPos = min(globalPos, int3(Resolution-1, Resolution-1, Resolution-1));
+        globalPos = min(globalPos, int3(Resolution-1));
         vorticityCache[i] = length(CurlRead[globalPos].xyz);
     }
 
     GroupMemoryBarrierWithGroupSync();
-    if (id.x >= Resolution || id.y >= Resolution || id.z >= Resolution) return;
+    if (any(id >= Resolution)) return;
 
     float3 vel = VelocityRead[id].xyz;
     float4 smokeProp = SmokePropRead[id];
@@ -237,7 +237,7 @@ void ExternalForces(
     float wB = vorticityCache[GetCacheIndex(uint3(pos + int3( 0,  0, -1)))];
     float wF = vorticityCache[GetCacheIndex(uint3(pos + int3( 0,  0,  1)))];
 
-    float dx = BoundsSize.x / float(Resolution);
+    float dx = BoundsSize.x / float(Resolution.x);
     float3 eta = float3(wR - wL, wU - wD, wF - wB) / (2.0 * dx);
 
     if (length(eta) > 0.001)
@@ -250,7 +250,7 @@ void ExternalForces(
     }
 
     // Cheat ambient wind
-    float3 uvw = (float3(id) + 0.5) / float(Resolution);
+    float3 uvw = (float3(id) + 0.5) / float3(Resolution);
     float3 worldPos = BoundsMin + (uvw * BoundsSize);
 
     float3 wind;
@@ -263,11 +263,11 @@ void ExternalForces(
     // Concussive Blast
     // TODO // Cache
     float rL = SmokePropRead[uint3(max(0, (int)id.x - 1), id.y, id.z)].a;
-    float rR = SmokePropRead[uint3(min(Resolution - 1, id.x + 1), id.y, id.z)].a;
+    float rR = SmokePropRead[uint3(min(Resolution.x - 1, id.x + 1), id.y, id.z)].a;
     float rD = SmokePropRead[uint3(id.x, max(0, (int)id.y - 1), id.z)].a;
-    float rU = SmokePropRead[uint3(id.x, min(Resolution - 1, id.y + 1), id.z)].a;
+    float rU = SmokePropRead[uint3(id.x, min(Resolution.y - 1, id.y + 1), id.z)].a;
     float rB = SmokePropRead[uint3(id.x, id.y, max(0, (int)id.z - 1))].a;
-    float rF = SmokePropRead[uint3(id.x, id.y, min(Resolution - 1, id.z + 1))].a;
+    float rF = SmokePropRead[uint3(id.x, id.y, min(Resolution.z - 1, id.z + 1))].a;
 
     float3 reactionGradient = float3(rR - rL, rU - rD, rF - rB) / (2.0 * dx);
     vel -= ReactionExpansion * reactionGradient * DeltaTime;
@@ -288,12 +288,12 @@ void ComputeDivergence(
         uint3 pos = GetCachePos(i);
         int3 globalPos = int3(groupId * GROUP_SIZE) + int3(pos) - int3(1, 1, 1);
         globalPos = max(int3(0, 0, 0), globalPos);
-        globalPos = min(globalPos, int3(Resolution-1, Resolution-1, Resolution-1));
+        globalPos = min(globalPos, int3(Resolution-1));
         velCache[i] = VelocityRead[globalPos].xyz;
     }
 
     GroupMemoryBarrierWithGroupSync();
-    if (id.x >= Resolution || id.y >= Resolution || id.z >= Resolution) return;
+    if (any(id >= Resolution)) return;
 
     uint3 pos = groupThreadId + uint3(1, 1, 1); // Offset for the padding
 
@@ -304,13 +304,13 @@ void ComputeDivergence(
     float3 vB = velCache[GetCacheIndex(uint3(pos + int3( 0,  0, -1)))];
     float3 vF = velCache[GetCacheIndex(uint3(pos + int3( 0,  0,  1)))];
 
-    float dx = BoundsSize.x / float(Resolution);
+    float dx = BoundsSize.x / float(Resolution.x);
     float div = ((vR.x - vL.x) + (vU.y - vD.y) + (vF.z - vB.z)) / (2.0 * dx);
 
     if (IsInjecting)
     {
         // +.5 to sample the center of the the voxel
-        float3 uvw = (float3(id) + 0.5) / float(Resolution);
+        float3 uvw = (float3(id) + 0.5) / float3(Resolution);
         float3 worldPos = BoundsMin + (uvw * BoundsSize);
         for (uint i = 0; i < EmitterCount; ++i)
         {
@@ -343,12 +343,12 @@ void PressureIteration(
     {
         uint3 pos = GetCachePos(i);
         int3 globalPos = int3(groupId * GROUP_SIZE) + int3(pos) - int3(1, 1, 1);
-        bool isOutside = any(globalPos < 0) || any(globalPos >= int3(Resolution, Resolution, Resolution));
+        bool isOutside = any(globalPos < 0) || any(globalPos >= int3(Resolution));
         pressureCache[i] = isOutside ? 0.0 : PressureRead[globalPos];
     }
 
     GroupMemoryBarrierWithGroupSync();
-    if (id.x >= Resolution || id.y >= Resolution || id.z >= Resolution) return;
+    if (any(id >= Resolution)) return;
 
     uint3 pos = groupThreadId + uint3(1, 1, 1); // Offset for the padding
 
@@ -359,7 +359,7 @@ void PressureIteration(
     float pB = pressureCache[GetCacheIndex(uint3(pos + int3( 0,  0, -1)))];
     float pF = pressureCache[GetCacheIndex(uint3(pos + int3( 0,  0,  1)))];
 
-    float dx = BoundsSize.x / float(Resolution);
+    float dx = BoundsSize.x / float(Resolution.x);
     float div = DivergenceRead[id];
     PressureWrite[id] = (pL + pR + pD + pU + pB + pF - (dx * dx * div)) / 6.0;
 }
@@ -376,12 +376,12 @@ void ProjectVelocity(
     {
         uint3 pos = GetCachePos(i);
         int3 globalPos = int3(groupId * GROUP_SIZE) + int3(pos) - int3(1, 1, 1);
-        bool isOutside = any(globalPos < 0) || any(globalPos >= int3(Resolution, Resolution, Resolution));
+        bool isOutside = any(globalPos < 0) || any(globalPos >= int3(Resolution));
         pressureCache[i] = isOutside ? 0.0 : PressureRead[globalPos];
     }
 
     GroupMemoryBarrierWithGroupSync();
-    if (id.x >= Resolution || id.y >= Resolution || id.z >= Resolution) return;
+    if (any(id >= Resolution)) return;
 
     uint3 pos = groupThreadId + uint3(1, 1, 1); // Offset for the padding
 
@@ -392,7 +392,7 @@ void ProjectVelocity(
     float pB = pressureCache[GetCacheIndex(uint3(pos + int3( 0,  0, -1)))];
     float pF = pressureCache[GetCacheIndex(uint3(pos + int3( 0,  0,  1)))];
 
-    float dx = BoundsSize.x / float(Resolution);
+    float dx = BoundsSize.x / float(Resolution.x);
     float3 vel = VelocityRead[id].xyz;
     vel.x -= (pR - pL) / (2.0 * dx);
     vel.y -= (pU - pD) / (2.0 * dx);
@@ -404,7 +404,7 @@ void ProjectVelocity(
 void Step(uint3 id : SV_DispatchThreadID)
 {
     // +.5 to sample the center of the the voxel
-    float3 uvw = ((float3(id) + 0.5) / float(Resolution));
+    float3 uvw = ((float3(id) + 0.5) / float3(Resolution));
     float3 uvwVel = VelocityRead[id].xyz / BoundsSize;
 
     // MacCormack Advection
@@ -418,14 +418,14 @@ void Step(uint3 id : SV_DispatchThreadID)
     float4 advectedVel = backVel;
 
     // Clamp to neighborhood values of regular semi-lagrangian result
-    float off = 1.0 / float(Resolution);
+    float3 off = 1.0 / float3(Resolution);
     float4 sM = SmokePropRead.SampleLevel(sampler_LinearClamp, backUvw, 0);
-    float4 sL = SmokePropRead.SampleLevel(sampler_LinearClamp, backUvw + float3(-off, 0.0, 0.0), 0);
-    float4 sR = SmokePropRead.SampleLevel(sampler_LinearClamp, backUvw + float3( off, 0.0, 0.0), 0);
-    float4 sB = SmokePropRead.SampleLevel(sampler_LinearClamp, backUvw + float3(0.0, -off, 0.0), 0);
-    float4 sF = SmokePropRead.SampleLevel(sampler_LinearClamp, backUvw + float3(0.0,  off, 0.0), 0);
-    float4 sD = SmokePropRead.SampleLevel(sampler_LinearClamp, backUvw + float3(0.0, 0.0, -off), 0);
-    float4 sU = SmokePropRead.SampleLevel(sampler_LinearClamp, backUvw + float3(0.0, 0.0,  off), 0);
+    float4 sL = SmokePropRead.SampleLevel(sampler_LinearClamp, backUvw + float3(-off.x, 0.0, 0.0), 0);
+    float4 sR = SmokePropRead.SampleLevel(sampler_LinearClamp, backUvw + float3( off.x, 0.0, 0.0), 0);
+    float4 sB = SmokePropRead.SampleLevel(sampler_LinearClamp, backUvw + float3(0.0, -off.y, 0.0), 0);
+    float4 sF = SmokePropRead.SampleLevel(sampler_LinearClamp, backUvw + float3(0.0,  off.y, 0.0), 0);
+    float4 sD = SmokePropRead.SampleLevel(sampler_LinearClamp, backUvw + float3(0.0, 0.0, -off.z), 0);
+    float4 sU = SmokePropRead.SampleLevel(sampler_LinearClamp, backUvw + float3(0.0, 0.0,  off.z), 0);
 
     float4 minSmokeProps = min(sM, min(min(sL, sR), min(min(sB, sF), min(sD, sU))));
     float4 maxSmokeProps = max(sM, max(max(sL, sR), max(max(sB, sF), max(sD, sU))));
@@ -503,9 +503,9 @@ void Step(uint3 id : SV_DispatchThreadID)
 [numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
 void CalculateShadows(uint3 id : SV_DispatchThreadID)
 {
-    if (id.x >= Resolution || id.y >= Resolution || id.z >= Resolution) return;
+    if (any(id >= Resolution)) return;
     // +.5 to sample the center of the the voxel
-    float3 uvw = ((float3(id) + 0.5) / float(Resolution));
+    float3 uvw = ((float3(id) + 0.5) / float3(Resolution));
     float3 uvwStep = (LightDirection / BoundsSize) * ShadowStepSize;
 
     float totalDensity = 0.0;
