@@ -155,6 +155,9 @@ Shader "Custom/SurfaceExplosionMarch"
                 // _Time is a float4 in URP, .y is unscaled time
                 float3 noiseOffset = float3(0, -_Time.y * _NoiseSpeed, 0);
 
+                float prevHeat = 0.0;
+                float3 prevRayPos = rayPos;
+
                 for (int step = 0; step < 32; step++)
                 {
                     if (any(rayPos < 0) || any(rayPos > 1)) break;
@@ -167,29 +170,39 @@ Shader "Custom/SurfaceExplosionMarch"
                     float thresh = _MinTemperature / _MaxTemperature;
                     if (heat > thresh)
                     {
-                        finalColor = float4(blackbodyColor(heat), 1.0);
+                        // lerp to the actual surface
+                        float fraction = (thresh - prevHeat) / (heat - prevHeat + 0.0001); // Runs even if heat <= thresh! This is on GPU!
+                        float3 surfPos = lerp(prevRayPos, rayPos, fraction);
+
+                        // Sample below the surface
+                        // TODO // Make the sample depth a parameter
+                        float3 samplePos = saturate(surfPos + (rayDir * (_StepSize * 1)));
+                        float sampleHeat = SAMPLE_TEXTURE3D(_VolumeTex, sampler_VolumeTex, samplePos).r;
+
+                        finalColor = float4(blackbodyColor(sampleHeat), 1.0);
                         break;
                     }
 
-                    if (baseDensity > 0.01)
+                    float3 noiseSamplePos = (IN.worldPos * _NoiseScale) + noiseOffset;
+                    float noiseVal = fbm(noiseSamplePos);
+                    float heatErrosion = heat * 0.02;
+                    float erodedDensity = saturate(baseDensity - heatErrosion - (noiseVal * _NoiseStrength * (1.0 - baseDensity)));
+
+                    // TODO // Make the cutoff a parameter
+                    if (erodedDensity > 0.1)
                     {
-                        float3 noiseSamplePos = (IN.worldPos * _NoiseScale) + noiseOffset;
-                        float noiseVal = fbm(noiseSamplePos);
-                        float heatErrosion = heat * 0.02;
-                        float erodedDensity = saturate(baseDensity - heatErrosion - (noiseVal * _NoiseStrength * (1.0 - baseDensity)));
+                        float lightTransmission = SAMPLE_TEXTURE3D(_ShadowTex, sampler_VolumeTex, rayPos).r;
 
-                        if (erodedDensity > 0.1)
-                        {
-                            float lightTransmission = SAMPLE_TEXTURE3D(_ShadowTex, sampler_VolumeTex, rayPos).r;
+                        float3 directLight = _SmokeMainLightColor.rgb * lightTransmission;
+                        float3 totalLight  = directLight + _AmbientColor.rgb;
+                        float3 smokeColor = _SmokeAlbedo.rgb * totalLight;
 
-                            float3 directLight = _SmokeMainLightColor.rgb * lightTransmission;
-                            float3 totalLight  = directLight + _AmbientColor.rgb;
-                            float3 smokeColor = _SmokeAlbedo.rgb * totalLight;
-
-                            finalColor = float4(smokeColor, 1.0);
-                            break;
-                        }
+                        finalColor = float4(smokeColor, 1.0);
+                        break;
                     }
+
+                    prevHeat = heat;
+                    prevRayPos = rayPos;
 
                     rayPos += rayDir * _StepSize;
                     IN.worldPos += normalize(IN.worldPos - GetCameraPositionWS()) * _StepSize;
