@@ -105,6 +105,7 @@ float ShadowSteps;
 
 // Misc
 float ThermalDecay;
+float SmokeDecay;
 
 // Groupshare Cache
 groupshared float3 velCache[TOTAL_CACHE];
@@ -410,8 +411,9 @@ void Step(uint3 id : SV_DispatchThreadID)
     // MacCormack Advection
     float3 backUvw = uvw - (uvwVel * DeltaTime * SimScale);
     float4 backVel = VelocityRead.SampleLevel(sampler_LinearClamp, backUvw, 0);
+    float3 backUvwVel = backVel.xyz / BoundsSize;
 
-    float3 forwardUvw = backUvw + (backVel.xyz * DeltaTime * SimScale);
+    float3 forwardUvw = backUvw + (backUvwVel * DeltaTime * SimScale);
     float3 prevUvw = backUvw + (uvw - forwardUvw) / 2.0;
 
     float4 advectedSmokeProps = SmokePropRead.SampleLevel(sampler_LinearClamp, prevUvw, 0);
@@ -494,7 +496,7 @@ void Step(uint3 id : SV_DispatchThreadID)
     heat = advectedSmokeProps.r;
     smoke = advectedSmokeProps.g;
     advectedSmokeProps.r = max(0.0, heat - (ThermalDecay * heat * heat * DeltaTime));
-    advectedSmokeProps.g = max(0.0, smoke - (0.5 * smoke * DeltaTime));
+    advectedSmokeProps.g = max(0.0, smoke - (SmokeDecay * smoke * DeltaTime));
 
     SmokePropWrite[id] = advectedSmokeProps;
     VelocityWrite[id] = advectedVel;

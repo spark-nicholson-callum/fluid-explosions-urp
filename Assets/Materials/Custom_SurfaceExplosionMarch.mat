@@ -33,12 +33,15 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _EmissionIntensity: 10
-    - _MaxTemperature: 30
-    - _MinTemperature: 10
+    - _EmissionIntensity: 25
+    - _FireSurfaceDepth: 1.5
+    - _HeatErrosion: 0.05
+    - _MaxTemperature: 27
+    - _MinTemperature: 7
     - _NoiseScale: 10
     - _NoiseSpeed: 0.5
     - _NoiseStrength: 0.33
+    - _SmokeDensityCutoff: 0.1
     - _StepSize: 0.02
     m_Colors:
     - _AmbientColor: {r: 0.14999998, g: 0.19999996, b: 0.24999997, a: 1}

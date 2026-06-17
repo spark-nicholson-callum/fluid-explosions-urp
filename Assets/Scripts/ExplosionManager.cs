@@ -36,6 +36,7 @@ public class ExplosionManager : MonoBehaviour
 
     [Header("Misc")]
     [SerializeField] private float thermalDecay = 0.4f;
+    [SerializeField] private float smokeDecay = 0.3f;
 
     [Header("Lighting")]
     [SerializeField] private Light mainLight;
@@ -224,6 +225,7 @@ public class ExplosionManager : MonoBehaviour
         fluidSimCompute.SetFloat("SmokeChoke", smokeChoke);
 
         fluidSimCompute.SetFloat("ThermalDecay", thermalDecay);
+        fluidSimCompute.SetFloat("SmokeDecay", smokeDecay);
 
         DispatchKernel(stepKernel);
         smokePropTexture.SwapBuffers();

@@ -24,6 +24,7 @@ Shader "Custom/SurfaceExplosionMarch"
         [Header(Surface Render Settings)]
         _FireSurfaceDepth ("Fire Surface Depth", Float) = 1.0
         _SmokeDensityCutoff("Smoke Density Cutoff", Float) = 0.1
+        _HeatErrosion("Heat Errosion", Float) = 0.1
     }
     SubShader
     {
@@ -79,6 +80,7 @@ Shader "Custom/SurfaceExplosionMarch"
 
                 float _FireSurfaceDepth;
                 float _SmokeDensityCutoff;
+                float _HeatErrosion;
             CBUFFER_END
 
             float random(float2 st)
@@ -191,7 +193,7 @@ Shader "Custom/SurfaceExplosionMarch"
 
                     float3 noiseSamplePos = (IN.worldPos * _NoiseScale) + noiseOffset;
                     float noiseVal = fbm(noiseSamplePos);
-                    float heatErrosion = heat * 0.02;
+                    float heatErrosion = heat * _HeatErrosion;
                     float erodedDensity = saturate(baseDensity - heatErrosion - (noiseVal * _NoiseStrength * (1.0 - baseDensity)));
 
                     if (erodedDensity > _SmokeDensityCutoff)

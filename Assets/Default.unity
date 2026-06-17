@@ -10994,6 +10994,7 @@ MonoBehaviour:
   reactionExpansion: 2
   smokeChoke: 10
   thermalDecay: 0.4
+  smokeDecay: 0.3
   mainLight: {fileID: 0}
   shadowStepSize: 0.05
   shadowAbsorption: 5
@@ -11252,6 +11253,7 @@ MonoBehaviour:
   reactionExpansion: 1.5
   smokeChoke: 20
   thermalDecay: 0.8
+  smokeDecay: 0.3
   mainLight: {fileID: 0}
   shadowStepSize: 0.05
   shadowAbsorption: 5
@@ -11631,6 +11633,7 @@ MonoBehaviour:
   reactionExpansion: 2
   smokeChoke: 10
   thermalDecay: 0.4
+  smokeDecay: 0.3
   mainLight: {fileID: 312765082}
   shadowStepSize: 0.05
   shadowAbsorption: 5
@@ -16689,6 +16692,7 @@ MonoBehaviour:
   reactionExpansion: 2
   smokeChoke: 10
   thermalDecay: 0.4
+  smokeDecay: 0.3
   mainLight: {fileID: 0}
   shadowStepSize: 0.05
   shadowAbsorption: 5
@@ -16843,6 +16847,7 @@ MonoBehaviour:
   reactionExpansion: 2
   smokeChoke: 10
   thermalDecay: 0.4
+  smokeDecay: 0.3
   mainLight: {fileID: 0}
   shadowStepSize: 0.05
   shadowAbsorption: 5
@@ -16996,6 +17001,7 @@ MonoBehaviour:
   reactionExpansion: 1.5
   smokeChoke: 20
   thermalDecay: 2
+  smokeDecay: 0.3
   mainLight: {fileID: 312765082}
   shadowStepSize: 0.05
   shadowAbsorption: 5
@@ -17150,6 +17156,7 @@ MonoBehaviour:
   reactionExpansion: 2
   smokeChoke: 10
   thermalDecay: 0.4
+  smokeDecay: 0.3
   mainLight: {fileID: 0}
   shadowStepSize: 0.05
   shadowAbsorption: 5
@@ -17581,6 +17588,7 @@ MonoBehaviour:
   reactionExpansion: 2
   smokeChoke: 10
   thermalDecay: 0.4
+  smokeDecay: 0.3
   mainLight: {fileID: 0}
   shadowStepSize: 0.05
   shadowAbsorption: 5
@@ -28518,23 +28526,24 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ExplosionManager
   fluidSimCompute: {fileID: 7200000, guid: e216cbea8501e1f4a88c169fe10897d9, type: 3}
-  resolution: {x: 64, y: 128, z: 64}
+  resolution: {x: 32, y: 128, z: 32}
   simScale: 1
-  pressureIterations: 40
-  buoyancyStrength: 10
-  smokeWeight: 2
+  pressureIterations: 30
+  buoyancyStrength: 15
+  smokeWeight: 3
   vorticityStrength: 10
   ambientWindScale: 1.4
   ambientWindSpeed: 0.5
   ignitionTemp: 0.5
   burnRate: 4
-  smokeEmission: 5
+  smokeEmission: 4
   heatEmission: 6
   burnExpansion: 200
-  thermalExpansion: 0.22
+  thermalExpansion: 0.4
   reactionExpansion: 1.5
   smokeChoke: 20
-  thermalDecay: 2
+  thermalDecay: 1.5
+  smokeDecay: 0.25
   mainLight: {fileID: 312765082}
   shadowStepSize: 0.05
   shadowAbsorption: 5
@@ -28631,7 +28640,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 7.05, z: 2.45}
-  m_LocalScale: {x: 7, y: 14, z: 7}
+  m_LocalScale: {x: 3.5, y: 14, z: 3.5}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1761992726}
@@ -28741,6 +28750,7 @@ MonoBehaviour:
   reactionExpansion: 2
   smokeChoke: 10
   thermalDecay: 0.4
+  smokeDecay: 0.3
   mainLight: {fileID: 0}
   shadowStepSize: 0.05
   shadowAbsorption: 5
@@ -29007,6 +29017,7 @@ MonoBehaviour:
   reactionExpansion: 2
   smokeChoke: 10
   thermalDecay: 0.4
+  smokeDecay: 0.3
   mainLight: {fileID: 0}
   shadowStepSize: 0.05
   shadowAbsorption: 5
@@ -29375,7 +29386,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: -0.416, z: 0}
-  m_LocalScale: {x: 0.14999999, y: 0.075, z: 0.14999999}
+  m_LocalScale: {x: 0.3, y: 0.075, z: 0.3}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1552856260}
@@ -29563,6 +29574,7 @@ MonoBehaviour:
   reactionExpansion: 1.5
   smokeChoke: 20
   thermalDecay: 2
+  smokeDecay: 0.3
   mainLight: {fileID: 0}
   shadowStepSize: 0.05
   shadowAbsorption: 5
@@ -29716,6 +29728,7 @@ MonoBehaviour:
   reactionExpansion: 1.5
   smokeChoke: 20
   thermalDecay: 1
+  smokeDecay: 0.3
   mainLight: {fileID: 0}
   shadowStepSize: 0.05
   shadowAbsorption: 5
@@ -29980,6 +29993,7 @@ MonoBehaviour:
   reactionExpansion: 2
   smokeChoke: 10
   thermalDecay: 0.4
+  smokeDecay: 0.3
   mainLight: {fileID: 0}
   shadowStepSize: 0.05
   shadowAbsorption: 5
@@ -30112,8 +30126,8 @@ Transform:
   m_GameObject: {fileID: 1881739214}
   serializedVersion: 2
   m_LocalRotation: {x: -0.70710695, y: -0, z: -0, w: 0.70710665}
-  m_LocalPosition: {x: 0, y: -0.183, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1.5453}
+  m_LocalPosition: {x: 0, y: -0.183, z: -0}
+  m_LocalScale: {x: 1, y: 1, z: 1.22}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1552856260}
