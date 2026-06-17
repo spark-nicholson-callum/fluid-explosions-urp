@@ -13,6 +13,8 @@
 
 #pragma kernel CalculateShadows
 
+#include "noise.hlsl"
+
 struct Emitter
 {
     float4x4 worldToLocal;
@@ -84,8 +86,8 @@ bool IsInjecting;
 float Buoyancy;
 float SmokeWeight;
 float VorticityStrength;
-float AmbientWindScale;
-float AmbientWindSpeed;
+float CurlNoiseScale;
+float CurlNoiseStrength;
 
 // Explosion Variables
 float IgnitionTemp;
@@ -250,16 +252,10 @@ void ExternalForces(
         vel += vorticityForce * DeltaTime;
     }
 
-    // Cheat ambient wind
+    // Curl noise
     float3 uvw = (float3(id) + 0.5) / float3(Resolution);
     float3 worldPos = BoundsMin + (uvw * BoundsSize);
-
-    float3 wind;
-    wind.x = sin(worldPos.y * AmbientWindScale + Time) * cos(worldPos.z * AmbientWindScale + Time);
-    wind.y = sin(worldPos.z * AmbientWindScale + Time) * cos(worldPos.x * AmbientWindScale + Time);
-    wind.z = sin(worldPos.x * AmbientWindScale + Time) * cos(worldPos.y * AmbientWindScale + Time);
-
-    vel += wind * AmbientWindSpeed * DeltaTime;
+    vel += curlNoise(worldPos * CurlNoiseScale) * DeltaTime * CurlNoiseStrength;
 
     // Concussive Blast
     // TODO // Cache

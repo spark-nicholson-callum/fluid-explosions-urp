@@ -46,6 +46,7 @@ Shader "Custom/SurfaceExplosionMarch"
             #pragma fragment frag
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "noise.hlsl"
 
             struct Attributes
             {
@@ -89,35 +90,13 @@ Shader "Custom/SurfaceExplosionMarch"
                 return frac(sin(dot(st.xy, float2(12.9898, 78.233))) * 43758.5453123);
             }
 
-            float noise3D(float3 x)
-            {
-                // Don't ask me about this, blame Gemini (it does work though)
-                float3 p = floor(x);
-                float3 f = frac(x);
-                f = f * f * (3.0 - 2.0 * f);
-
-                float n = p.x + p.y * 157.0 + 113.0 * p.z;
-                float a = frac(sin(n) * 43758.5453123);
-                float b = frac(sin(n + 1.0) * 43758.5453123);
-                float c = frac(sin(n + 157.0) * 43758.5453123);
-                float d = frac(sin(n + 158.0) * 43758.5453123);
-                float e = frac(sin(n + 113.0) * 43758.5453123);
-                float f_n = frac(sin(n + 114.0) * 43758.5453123);
-                float g = frac(sin(n + 270.0) * 43758.5453123);
-                float h = frac(sin(n + 271.0) * 43758.5453123);
-
-                float res = lerp(lerp(lerp(a, b, f.x), lerp(c, d, f.x), f.y),
-                                 lerp(lerp(e, f_n, f.x), lerp(g, h, f.x), f.y), f.z);
-                return res;
-            }
-
             float fbm(float3 p)
             {
                 float f = 0.0;
                 float amp = 0.5;
                 for(int i = 0; i < 4; i++)
                 {
-                    f += amp * noise3D(p);
+                    f += amp * snoise(p);
                     p *= 2.0;
                     amp *= 0.5;
                 }
