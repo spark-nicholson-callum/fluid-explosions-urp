@@ -100,7 +100,7 @@ public class ExplosionManager : MonoBehaviour
         divergenceTexture = new(() => CreateVolume(RenderTextureFormat.RHalf));
         pressureTexture   = new(() => CreateVolume(RenderTextureFormat.RHalf));
         smokePropTexture  = new(() => CreateVolume());
-        shadowTexture = CreateVolume(RenderTextureFormat.RHalf);
+        shadowTexture = CreateVolume();
 
         for (int i = 0; i < 2; ++i)
         {
@@ -284,15 +284,7 @@ public class ExplosionManager : MonoBehaviour
         velocityTexture.SwapBuffers();
 
         // Calculate Shadows
-        if (mainLight != null)
-        {
-            Vector3 lightDir = -mainLight.transform.forward;
-            fluidSimCompute.SetVector("LightDirection", lightDir);
-        }
-        else
-        {
-            fluidSimCompute.SetVector("LightDirection", Vector3.up);
-        }
+        fluidSimCompute.SetVector("LightDirection", getLightDirection(mainLight));
         fluidSimCompute.SetFloat("ShadowStepSize", shadowStepSize);
         fluidSimCompute.SetFloat("ShadowAbsorption", shadowAbsorption);
         fluidSimCompute.SetFloat("ShadowSteps", shadowSteps);
@@ -306,8 +298,15 @@ public class ExplosionManager : MonoBehaviour
         rayMarchMaterial.SetTexture("_ShadowTex", shadowTexture);
         rayMarchMaterial.SetVector("_BoundsMin", bounds.min);
         rayMarchMaterial.SetVector("_BoundsSize", bounds.size);
+        rayMarchMaterial.SetVector("_LightDirection", getLightDirection(mainLight));
 
         DrawDebug();
+    }
+
+    Vector3 getLightDirection(Light light)
+    {
+        if (light == null) return Vector3.up;
+        return -light.transform.forward;
     }
 
     void DispatchKernel(int kernel)

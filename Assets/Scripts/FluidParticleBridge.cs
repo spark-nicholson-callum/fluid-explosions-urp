@@ -27,7 +27,7 @@ public class FluidParticleBridge : MonoBehaviour
     private ParticleSystem pSystem;
     private ParticleSystem.Particle[] particles;
     private ParticleFluidData[] fluidData = {};
-    private List<Vector4> customData = new();  
+    private List<Vector4> customData = new();
     private int particleCount;
 
     public ParticleFluidData[] FluidData => fluidData;

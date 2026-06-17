@@ -54,7 +54,7 @@ Texture3D<float> PressureRead;
 RWTexture3D<float4> SmokePropWrite;
 Texture3D<float4> SmokePropRead;
 
-RWTexture3D<float> ShadowWrite;
+RWTexture3D<float4> ShadowWrite;
 
 StructuredBuffer<Emitter> Emitters;
 uint EmitterCount;
@@ -157,7 +157,7 @@ void Init(uint3 id : SV_DispatchThreadID)
     DivergenceWrite[id] = 0.0;
     PressureWrite[id] = 0.0;
     SmokePropWrite[id] = float4(0.0, 0.0, 0.0, 0.0);
-    ShadowWrite[id] = 0.0;
+    ShadowWrite[id] = float4(0.0, 0.0, 0.0, 0.0);
 }
 
 [numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
@@ -507,10 +507,9 @@ void CalculateShadows(uint3 id : SV_DispatchThreadID)
     float3 uvw = ((float3(id) + 0.5) / float3(Resolution));
     float3 uvwStep = (LightDirection / BoundsSize) * ShadowStepSize;
 
+    // Ray march to find light transmission
     float totalDensity = 0.0;
-
     float3 rayPos = uvw;
-
     for (int i = 0; i < ShadowSteps; i++)
     {
         rayPos += uvwStep;
@@ -522,7 +521,18 @@ void CalculateShadows(uint3 id : SV_DispatchThreadID)
         density = density < 0.1 ? 0.0 : density;
         totalDensity += density;
     }
-
     float transmission = exp(-totalDensity * ShadowStepSize * ShadowAbsorption);
-    ShadowWrite[id] = transmission;
+
+    // Calculate gradient to act as a faux surface normal later
+    // TODO // Cache this
+    float dL = SmokePropRead[uint3(max(0, (int)id.x - 1), id.y, id.z)].g;
+    float dR = SmokePropRead[uint3(min(Resolution.x - 1, id.x +1), id.y, id.z)].g;
+    float dD = SmokePropRead[uint3(id.x, max(0, (int)id.y - 1), id.z)].g;
+    float dU = SmokePropRead[uint3(id.x, min(Resolution.y - 1, id.y +1), id.z)].g;
+    float dB = SmokePropRead[uint3(id.x, id.y, max(0, (int)id.z - 1))].g;
+    float dF = SmokePropRead[uint3(id.x, id.y, min(Resolution.z - 1, id.z +1))].g;
+
+    float3 normal = -normalize(float3(dR - dL, dU - dD, dF - dB) + 0.0001);
+
+    ShadowWrite[id] = float4(normal, transmission);
 }

@@ -75,6 +75,7 @@ Shader "Custom/SurfaceExplosionMarch"
                 float _MaxTemperature;
                 float _EmissionIntensity;
 
+                float3 _LightDirection;
                 float4 _SmokeMainLightColor;
                 float4 _AmbientColor;
                 float4 _SmokeAlbedo;
@@ -94,7 +95,7 @@ Shader "Custom/SurfaceExplosionMarch"
             {
                 float f = 0.0;
                 float amp = 0.5;
-                for(int i = 0; i < 4; i++)
+                for(int i = 0; i < 3; i++)
                 {
                     f += amp * snoise(p);
                     p *= 2.0;
@@ -177,9 +178,13 @@ Shader "Custom/SurfaceExplosionMarch"
 
                     if (erodedDensity > _SmokeDensityCutoff)
                     {
-                        float lightTransmission = SAMPLE_TEXTURE3D(_ShadowTex, sampler_VolumeTex, rayPos).r;
+                        float4 shadowProps = SAMPLE_TEXTURE3D(_ShadowTex, sampler_VolumeTex, rayPos);
 
-                        float3 directLight = _SmokeMainLightColor.rgb * lightTransmission;
+                        float nDotL = dot(shadowProps.xyz, _LightDirection);
+                        float diffuse = 0.5 * nDotL + 0.5;
+                        diffuse = smoothstep(0.1, 0.9, diffuse);
+
+                        float3 directLight = _SmokeMainLightColor.rgb * shadowProps.w * diffuse;
                         float3 totalLight  = directLight + _AmbientColor.rgb;
                         float3 smokeColor = _SmokeAlbedo.rgb * totalLight;
 
