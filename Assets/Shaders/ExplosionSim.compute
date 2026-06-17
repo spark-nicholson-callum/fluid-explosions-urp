@@ -87,6 +87,7 @@ float Buoyancy;
 float SmokeWeight;
 float VorticityStrength;
 float CurlNoiseScale;
+float CurlNoiseSpeed;
 float CurlNoiseStrength;
 
 // Explosion Variables
@@ -255,7 +256,7 @@ void ExternalForces(
     // Curl noise
     float3 uvw = (float3(id) + 0.5) / float3(Resolution);
     float3 worldPos = BoundsMin + (uvw * BoundsSize);
-    vel += curlNoise(worldPos * CurlNoiseScale) * DeltaTime * CurlNoiseStrength;
+    vel += curlNoise(worldPos * CurlNoiseScale, Time * CurlNoiseSpeed) * DeltaTime * CurlNoiseStrength;
 
     // Concussive Blast
     // TODO // Cache

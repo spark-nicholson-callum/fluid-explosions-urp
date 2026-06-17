@@ -10984,6 +10984,7 @@ MonoBehaviour:
   smokeWeight: 3
   vorticityStrength: 25
   curlNoiseScale: 1.5
+  curlNoiseSpeed: 1.5
   curlNoiseStrength: 2
   ignitionTemp: 0.5
   burnRate: 4
@@ -11243,6 +11244,7 @@ MonoBehaviour:
   smokeWeight: 2
   vorticityStrength: 10
   curlNoiseScale: 1.5
+  curlNoiseSpeed: 1.5
   curlNoiseStrength: 2
   ignitionTemp: 0.5
   burnRate: 4
@@ -11623,6 +11625,7 @@ MonoBehaviour:
   smokeWeight: 4
   vorticityStrength: 25
   curlNoiseScale: 1.5
+  curlNoiseSpeed: 1.5
   curlNoiseStrength: 2
   ignitionTemp: 0.5
   burnRate: 10
@@ -16682,6 +16685,7 @@ MonoBehaviour:
   smokeWeight: 4
   vorticityStrength: 25
   curlNoiseScale: 1.5
+  curlNoiseSpeed: 1.5
   curlNoiseStrength: 2
   ignitionTemp: 0.5
   burnRate: 10
@@ -16837,6 +16841,7 @@ MonoBehaviour:
   smokeWeight: 1
   vorticityStrength: 10
   curlNoiseScale: 1.5
+  curlNoiseSpeed: 1.5
   curlNoiseStrength: 2
   ignitionTemp: 0.5
   burnRate: 4
@@ -16991,6 +16996,7 @@ MonoBehaviour:
   smokeWeight: 2
   vorticityStrength: 10
   curlNoiseScale: 1.5
+  curlNoiseSpeed: 1.5
   curlNoiseStrength: 2
   ignitionTemp: 0.5
   burnRate: 4
@@ -17146,6 +17152,7 @@ MonoBehaviour:
   smokeWeight: 4
   vorticityStrength: 25
   curlNoiseScale: 1.5
+  curlNoiseSpeed: 1.5
   curlNoiseStrength: 2
   ignitionTemp: 0.5
   burnRate: 10
@@ -17578,6 +17585,7 @@ MonoBehaviour:
   smokeWeight: 4
   vorticityStrength: 25
   curlNoiseScale: 1.5
+  curlNoiseSpeed: 1.5
   curlNoiseStrength: 2
   ignitionTemp: 0.5
   burnRate: 10
@@ -28533,7 +28541,8 @@ MonoBehaviour:
   smokeWeight: 3
   vorticityStrength: 8
   curlNoiseScale: 0.7
-  curlNoiseStrength: 1
+  curlNoiseSpeed: 1.5
+  curlNoiseStrength: 0.5
   ignitionTemp: 0.5
   burnRate: 4
   smokeEmission: 4
@@ -28740,6 +28749,7 @@ MonoBehaviour:
   smokeWeight: 1
   vorticityStrength: 10
   curlNoiseScale: 1.5
+  curlNoiseSpeed: 1.5
   curlNoiseStrength: 2
   ignitionTemp: 0.5
   burnRate: 4
@@ -29007,6 +29017,7 @@ MonoBehaviour:
   smokeWeight: 3
   vorticityStrength: 25
   curlNoiseScale: 1.5
+  curlNoiseSpeed: 1.5
   curlNoiseStrength: 2
   ignitionTemp: 0.5
   burnRate: 4
@@ -29564,6 +29575,7 @@ MonoBehaviour:
   smokeWeight: 2
   vorticityStrength: 10
   curlNoiseScale: 1.5
+  curlNoiseSpeed: 1.5
   curlNoiseStrength: 2
   ignitionTemp: 0.5
   burnRate: 4
@@ -29718,6 +29730,7 @@ MonoBehaviour:
   smokeWeight: 2
   vorticityStrength: 10
   curlNoiseScale: 1.5
+  curlNoiseSpeed: 1.5
   curlNoiseStrength: 2
   ignitionTemp: 0.5
   burnRate: 4
@@ -29983,6 +29996,7 @@ MonoBehaviour:
   smokeWeight: 3
   vorticityStrength: 25
   curlNoiseScale: 1.5
+  curlNoiseSpeed: 1.5
   curlNoiseStrength: 2
   ignitionTemp: 0.5
   burnRate: 4

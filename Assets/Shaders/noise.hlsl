@@ -48,7 +48,7 @@ float4 taylorInvSqrt(float4 r)
     return 1.79284291400159 - 0.85373472095314 * r;
 }
 
-float snoise(float3 v, out float3 gradient)
+float snoise(float3 v, float alpha, out float3 gradient)
 {
     const float2 C = float2(1.0/6.0, 1.0/3.0) ;
     const float4 D = float4(0.0, 0.5, 1.0, 2.0);
@@ -116,6 +116,25 @@ float snoise(float3 v, out float3 gradient)
     p2 *= norm.z;
     p3 *= norm.w;
 
+    // Rotate on (1, 1, 1)
+    float s, c;
+    sincos(alpha, s, c);
+
+    float t = 1.0 - c;
+    float t3 = t / 3.0;
+    float s3 = 0.577350269 * s; // 0.577350269 ~= 1/sqrt(3)
+
+    float3x3 rot = float3x3(
+        t3 + c,  t3 - s3, t3 + s3,
+        t3 + s3, t3 + c, t3 - s3,
+        t3 + s3, t3 + s3, t3 + c
+    );
+
+    p0 = mul(rot, p0);
+    p1 = mul(rot, p1);
+    p2 = mul(rot, p2);
+    p3 = mul(rot, p3);
+
     // Mix final noise value
     float4 m = max(0.5 - float4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
     float4 m2 = m * m;
@@ -131,21 +150,37 @@ float snoise(float3 v, out float3 gradient)
     return 105.0 * dot(m4, pdotx);
 }
 
+float snoise(float3 v, out float3 gradient)
+{
+    return snoise(v, 0.0, gradient);
+}
+
+float snoise(float3 v, float alpha)
+{
+    float3 dummy;
+    return snoise(v, alpha, dummy);
+}
+
 float snoise(float3 v)
 {
     float3 dummy;
-    return snoise(v, dummy);
+    return snoise(v, 0.0, dummy);
 }
 
-float3 curlNoise(float3 pos)
+float3 curlNoise(float3 pos, float alpha)
 {
     const float3 off1 = float3(123.456, 789.012, 345.678);
     const float3 off2 = float3(901.234, 567.890, 123.456);
 
     float3 gradX, gradY, gradZ;
-    snoise(pos, gradX);
-    snoise(pos + off1, gradY);
-    snoise(pos + off2, gradZ);
+    snoise(pos, alpha, gradX);
+    snoise(pos + off1, alpha, gradY);
+    snoise(pos + off2, alpha, gradZ);
 
     return float3(gradZ.y - gradY.z, gradX.z - gradZ.x, gradY.x - gradX.y);
+}
+
+float3 curlNoise(float3 pos)
+{
+    return curlNoise(pos, 0.0);
 }

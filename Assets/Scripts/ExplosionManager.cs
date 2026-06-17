@@ -22,6 +22,7 @@ public class ExplosionManager : MonoBehaviour
     [SerializeField] private float smokeWeight = 2.0f;
     [SerializeField] private float vorticityStrength = 20.0f;
     [SerializeField] private float curlNoiseScale = 1.5f;
+    [SerializeField] private float curlNoiseSpeed = 1.5f;
     [SerializeField] private float curlNoiseStrength = 2.0f;
 
     [Header("Explosion")]
@@ -243,6 +244,7 @@ public class ExplosionManager : MonoBehaviour
         fluidSimCompute.SetFloat("SmokeWeight", smokeWeight);
         fluidSimCompute.SetFloat("VorticityStrength", vorticityStrength);
         fluidSimCompute.SetFloat("CurlNoiseScale", curlNoiseScale);
+        fluidSimCompute.SetFloat("CurlNoiseSpeed", curlNoiseSpeed);
         fluidSimCompute.SetFloat("CurlNoiseStrength", curlNoiseStrength);
         fluidSimCompute.SetFloat("ReactionExpansion", reactionExpansion);
         fluidSimCompute.SetTexture(externalForcesKernel, "VelocityRead", velocityTexture.ReadBuffer);
