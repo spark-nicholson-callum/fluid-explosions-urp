@@ -4,10 +4,17 @@
 #define TOTAL_CACHE (CACHE_SIZE * CACHE_SIZE * CACHE_SIZE) // 1000
 
 #pragma kernel Init
+#pragma kernel InitMultigrid
+
 #pragma kernel ComputeCurl
 #pragma kernel ExternalForces
 #pragma kernel ComputeDivergence
+
 #pragma kernel PressureIteration
+#pragma kernel PressureResidual
+#pragma kernal PressureRestrict
+#pragma kernel PressureProlongate
+
 #pragma kernel ProjectVelocity
 #pragma kernel Step
 
@@ -47,6 +54,9 @@ RWTexture3D<float> DivergenceWrite;
 
 RWTexture3D<float> PressureWrite;
 Texture3D<float> PressureRead;
+
+RWTexture3D<float> PressureResidualWrite;
+Texture3D<float> PressureResidualRead;
 
 // r = heat, g = smoke density, b = fuel, a = reaction
 RWTexture3D<float4> SmokePropWrite;
@@ -153,12 +163,21 @@ uint3 getCachePos(uint i)
 [numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
 void Init(uint3 id : SV_DispatchThreadID)
 {
+    if (any(id >= Resolution)) return;
+
     VelocityWrite[id] = float4(0.0, 0.0, 0.0, 0.0);
     CurlWrite[id] = float4(0.0, 0.0, 0.0, 0.0);
-    DivergenceWrite[id] = 0.0;
     PressureWrite[id] = 0.0;
     SmokePropWrite[id] = float4(0.0, 0.0, 0.0, 0.0);
     ShadowWrite[id] = float4(0.0, 0.0, 0.0, 0.0);
+}
+
+[numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
+void InitMultigrid(uint3 id : SV_DispatchThreadID)
+{
+    if (any(id >= Resolution)) return;
+
+    DivergenceWrite[id] = 0.0;
 }
 
 [numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
@@ -361,6 +380,61 @@ void PressureIteration(
     float dx = BoundsSize.x / float(Resolution.x);
     float div = DivergenceWrite[id];
     PressureWrite[id] = (pL + pR + pD + pU + pB + pF - (dx * dx * div)) / 6.0;
+}
+
+[numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
+void PressureResidual(
+    uint3 id : SV_DispatchThreadID,
+    uint3 groupId : SV_GroupID,
+    uint3 groupThreadId : SV_GroupThreadId,
+    uint groupIndex : SV_GroupIndex
+) {
+    [unroll]
+    for (uint i = groupIndex; i < TOTAL_CACHE; i += TOTAL_THREADS)
+    {
+        uint3 pos = getCachePos(i);
+        int3 globalPos = int3(groupId * GROUP_SIZE) + int3(pos) - int3(1, 1, 1);
+        bool isOutside = any(globalPos < 0) || any(globalPos >= int3(Resolution));
+        pressureCache[i] = isOutside ? 0.0 : PressureRead[globalPos];
+    }
+
+    GroupMemoryBarrierWithGroupSync();
+    if (any(id >= Resolution)) return;
+
+    uint3 pos = groupThreadId + uint3(1, 1, 1); // Offset for the padding
+
+    float pC = pressureCache[getCacheIndex(pos)];
+    float pL = pressureCache[getCacheIndex(uint3(pos + int3(-1,  0,  0)))];
+    float pR = pressureCache[getCacheIndex(uint3(pos + int3( 1,  0,  0)))];
+    float pD = pressureCache[getCacheIndex(uint3(pos + int3( 0, -1,  0)))];
+    float pU = pressureCache[getCacheIndex(uint3(pos + int3( 0,  1,  0)))];
+    float pB = pressureCache[getCacheIndex(uint3(pos + int3( 0,  0, -1)))];
+    float pF = pressureCache[getCacheIndex(uint3(pos + int3( 0,  0,  1)))];
+
+    float laplacian = pL + pR + pD + pU + pB + pF - 6.0 * pC;
+    float div = DivergenceWrite[id];
+
+    PressureResidualWrite[id] = div - laplacian;
+}
+
+[numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
+void PressureRestrict(uint3 id : SV_DispatchThreadID)
+{
+    if (any(id >= Resolution)) return; // Resolution should be coarse resolution we are restricting to
+
+    // +.5 to sample center of the coarse voxel, which is the center of the 2x2x2 cluster
+    float3 uvw = ((float3(id) + 0.5) / float3(Resolution));
+    DivergenceWrite[id] = PressureResidualRead.SampleLevel(sampler_LinearClamp, uvw, 0);
+}
+
+[numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
+void PressureProlongate(uint3 id : SV_DispatchThreadID)
+{
+    if (any(id >= Resolution)) return; // Resolution should be fine resolution we are prolongating to
+
+    // +.5 to sample center of the fine voxel
+    float3 uvw = (float3(id) + 0.5) / float3(Resolution);
+    PressureWrite[id] += PressureRead.SampleLevel(sampler_LinearClamp, uvw, 0);
 }
 
 [numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]

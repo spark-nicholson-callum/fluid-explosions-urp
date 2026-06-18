@@ -16,6 +16,7 @@ public class ExplosionManager : MonoBehaviour
     [SerializeField] private Vector3Int resolution = new(64, 64, 64);
     [SerializeField] private float simScale = 1.0f;
     [SerializeField] private int pressureIterations = 40;
+    [SerializeField] private int multigridStages = 8;
 
     [Header("Forces")]
     [SerializeField] private float buoyancyStrength = 15.0f;
@@ -54,7 +55,7 @@ public class ExplosionManager : MonoBehaviour
     // TODO // Some of these don't need to be double buffered
     private DoubleBuffer<RenderTexture> velocityTexture;
     private RenderTexture curlTexture;
-    private RenderTexture divergenceTexture;
+    private ScaledBufferSet<RenderTexture, Vector3Int> divergenceTexture;
     private DoubleBuffer<RenderTexture> pressureTexture;
     private DoubleBuffer<RenderTexture> smokePropTexture;
     private RenderTexture shadowTexture;
@@ -67,6 +68,7 @@ public class ExplosionManager : MonoBehaviour
     private ParticleFluidData[] particleData;
 
     private int initKernel;
+    private int initMultigridKernel;
     private int curlKernel;
     private int externalForcesKernel;
     private int divergenceKernel;
@@ -75,11 +77,13 @@ public class ExplosionManager : MonoBehaviour
     private int stepKernel;
     private int shadowKernel;
 
+    private int safeMultigridStages;
     private Vector3Int threadGroups;
 
     void Start()
     {
         initKernel            = fluidSimCompute.FindKernel("Init");
+        initMultigridKernel   = fluidSimCompute.FindKernel("InitMultigrid");
         curlKernel            = fluidSimCompute.FindKernel("ComputeCurl");
         externalForcesKernel  = fluidSimCompute.FindKernel("ExternalForces");
         divergenceKernel      = fluidSimCompute.FindKernel("ComputeDivergence");
@@ -90,6 +94,19 @@ public class ExplosionManager : MonoBehaviour
 
         fluidSimCompute.SetInts("Resolution", resolution.x, resolution.y, resolution.z);
 
+        Vector3Int coarseRes = resolution;
+        for (safeMultigridStages = 1; safeMultigridStages <= multigridStages; ++safeMultigridStages)
+        {
+            bool oddRes = coarseRes.x % 2 != 0 || coarseRes.y % 2 != 0 || coarseRes.z % 2 != 0;
+            if (oddRes) break;
+
+            coarseRes /= 2;
+        }
+        if (safeMultigridStages != multigridStages)
+        {
+            Debug.LogWarning($"Cannot safely do {multigridStages} multigrid stages, doing {safeMultigridStages} stages instead.");
+        }
+
         uint groupSize;
         fluidSimCompute.GetKernelThreadGroupSizes(initKernel, out groupSize, out _, out _);
         threadGroups = resolution / (int)groupSize;
@@ -97,7 +114,7 @@ public class ExplosionManager : MonoBehaviour
         // Create textures
         velocityTexture   = new(() => CreateVolume());
         curlTexture       = CreateVolume();
-        divergenceTexture = CreateVolume(RenderTextureFormat.RHalf);
+        divergenceTexture = new(dim => CreateVolume(RenderTextureFormat.RHalf), (a,b) => a/b, resolution, safeMultigridStages);
         pressureTexture   = new(() => CreateVolume(RenderTextureFormat.RHalf));
         smokePropTexture  = new(() => CreateVolume());
         shadowTexture     = CreateVolume();
@@ -106,7 +123,6 @@ public class ExplosionManager : MonoBehaviour
         {
             fluidSimCompute.SetTexture(initKernel, "VelocityWrite", velocityTexture.WriteBuffer);
             fluidSimCompute.SetTexture(initKernel, "CurlWrite", curlTexture);
-            fluidSimCompute.SetTexture(initKernel, "DivergenceWrite", divergenceTexture);
             fluidSimCompute.SetTexture(initKernel, "PressureWrite", pressureTexture.WriteBuffer);
             fluidSimCompute.SetTexture(initKernel, "SmokePropWrite", smokePropTexture.WriteBuffer);
             fluidSimCompute.SetTexture(initKernel, "ShadowWrite", shadowTexture);
@@ -116,6 +132,16 @@ public class ExplosionManager : MonoBehaviour
             pressureTexture.SwapBuffers();
             smokePropTexture.SwapBuffers();
         }
+        coarseRes = resolution;
+        for (int i = 0; i < safeMultigridStages; ++i)
+        {
+            fluidSimCompute.SetInts("Resolution", coarseRes.x, coarseRes.y, coarseRes.z);
+            fluidSimCompute.SetTexture(initMultigridKernel, "DivergenceWrite", divergenceTexture.Get(i));
+            DispatchKernel(initMultigridKernel);
+
+            coarseRes /= 2;
+        }
+        fluidSimCompute.SetInts("Resolution", resolution.x, resolution.y, resolution.z);
 
         rayMarchMaterial = GetComponent<Renderer>().material;
     }
@@ -256,12 +282,12 @@ public class ExplosionManager : MonoBehaviour
         fluidSimCompute.SetFloat("ThermalExpansion", thermalExpansion);
         fluidSimCompute.SetTexture(divergenceKernel, "VelocityRead", velocityTexture.ReadBuffer);
         fluidSimCompute.SetTexture(divergenceKernel, "SmokePropRead", smokePropTexture.ReadBuffer);
-        fluidSimCompute.SetTexture(divergenceKernel, "DivergenceWrite", divergenceTexture);
+        fluidSimCompute.SetTexture(divergenceKernel, "DivergenceWrite", divergenceTexture.Get(0));
 
         DispatchKernel(divergenceKernel);
 
         // Calculate pressure
-        fluidSimCompute.SetTexture(pressureKernel, "DivergenceWrite", divergenceTexture);
+        fluidSimCompute.SetTexture(pressureKernel, "DivergenceWrite", divergenceTexture.Get(0));
         for (int i = 0; i < pressureIterations; ++i)
         {
             fluidSimCompute.SetTexture(pressureKernel, "PressureRead", pressureTexture.ReadBuffer);
@@ -323,7 +349,7 @@ public class ExplosionManager : MonoBehaviour
         switch (debugMode)
         {
             case DebugMode.Divergence:
-                debugMat.SetTexture("_VolumeTex", divergenceTexture);
+                debugMat.SetTexture("_VolumeTex", divergenceTexture.Get(0));
                 break;
             case DebugMode.Pressure:
                 debugMat.SetTexture("_VolumeTex", pressureTexture.ReadBuffer);
@@ -338,7 +364,7 @@ public class ExplosionManager : MonoBehaviour
     {
         smokePropTexture.ForEach(t => {if (t != null) t.Release();});
         if (curlTexture != null) curlTexture.Release();
-        if (divergenceTexture != null) divergenceTexture.Release();
+        divergenceTexture.ForEach(t => {if (t != null) t.Release();});
         pressureTexture.ForEach(t => {if (t != null) t.Release();});
         velocityTexture.ForEach(t => {if (t != null) t.Release();});
         if (shadowTexture != null) shadowTexture.Release();

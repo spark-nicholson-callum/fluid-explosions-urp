@@ -1,0 +1,26 @@
+using System;
+
+public class ScaledBufferSet<T, TIndex>
+{
+    private T[] buffers;
+
+    public ScaledBufferSet(Func<TIndex, T> generator, Func<TIndex, int, TIndex> divisionOp, TIndex size, int layers)
+    {
+        buffers = new T[layers];
+
+        for (int i = 0; i < layers; ++i)
+        {
+            buffers[i] = generator(divisionOp(size, i + 1));
+        }
+    }
+
+    public void ForEach(Action<T> action)
+    {
+        foreach(T buffer in buffers) action(buffer);
+    }
+
+    public T Get(int layer)
+    {
+        return buffers[layer];
+    }
+}
