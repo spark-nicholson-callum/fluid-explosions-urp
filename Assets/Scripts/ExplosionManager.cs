@@ -53,8 +53,8 @@ public class ExplosionManager : MonoBehaviour
 
     // TODO // Some of these don't need to be double buffered
     private DoubleBuffer<RenderTexture> velocityTexture;
-    private DoubleBuffer<RenderTexture> curlTexture;
-    private DoubleBuffer<RenderTexture> divergenceTexture;
+    private RenderTexture curlTexture;
+    private RenderTexture divergenceTexture;
     private DoubleBuffer<RenderTexture> pressureTexture;
     private DoubleBuffer<RenderTexture> smokePropTexture;
     private RenderTexture shadowTexture;
@@ -96,25 +96,23 @@ public class ExplosionManager : MonoBehaviour
 
         // Create textures
         velocityTexture   = new(() => CreateVolume());
-        curlTexture       = new(() => CreateVolume());
-        divergenceTexture = new(() => CreateVolume(RenderTextureFormat.RHalf));
+        curlTexture       = CreateVolume();
+        divergenceTexture = CreateVolume(RenderTextureFormat.RHalf);
         pressureTexture   = new(() => CreateVolume(RenderTextureFormat.RHalf));
         smokePropTexture  = new(() => CreateVolume());
-        shadowTexture = CreateVolume();
+        shadowTexture     = CreateVolume();
 
         for (int i = 0; i < 2; ++i)
         {
             fluidSimCompute.SetTexture(initKernel, "VelocityWrite", velocityTexture.WriteBuffer);
-            fluidSimCompute.SetTexture(initKernel, "CurlWrite", curlTexture.WriteBuffer);
-            fluidSimCompute.SetTexture(initKernel, "DivergenceWrite", divergenceTexture.WriteBuffer);
+            fluidSimCompute.SetTexture(initKernel, "CurlWrite", curlTexture);
+            fluidSimCompute.SetTexture(initKernel, "DivergenceWrite", divergenceTexture);
             fluidSimCompute.SetTexture(initKernel, "PressureWrite", pressureTexture.WriteBuffer);
             fluidSimCompute.SetTexture(initKernel, "SmokePropWrite", smokePropTexture.WriteBuffer);
             fluidSimCompute.SetTexture(initKernel, "ShadowWrite", shadowTexture);
             DispatchKernel(initKernel);
 
             velocityTexture.SwapBuffers();
-            curlTexture.SwapBuffers();
-            divergenceTexture.SwapBuffers();
             pressureTexture.SwapBuffers();
             smokePropTexture.SwapBuffers();
         }
@@ -234,10 +232,9 @@ public class ExplosionManager : MonoBehaviour
 
         // Calculate Curl
         fluidSimCompute.SetTexture(curlKernel, "VelocityRead", velocityTexture.ReadBuffer);
-        fluidSimCompute.SetTexture(curlKernel, "CurlWrite", curlTexture.WriteBuffer);
+        fluidSimCompute.SetTexture(curlKernel, "CurlWrite", curlTexture);
 
         DispatchKernel(curlKernel);
-        curlTexture.SwapBuffers();
 
         // Apply external forces
         fluidSimCompute.SetFloat("Buoyancy", buoyancyStrength);
@@ -250,7 +247,7 @@ public class ExplosionManager : MonoBehaviour
         fluidSimCompute.SetTexture(externalForcesKernel, "VelocityRead", velocityTexture.ReadBuffer);
         fluidSimCompute.SetTexture(externalForcesKernel, "VelocityWrite", velocityTexture.WriteBuffer);
         fluidSimCompute.SetTexture(externalForcesKernel, "SmokePropRead", smokePropTexture.ReadBuffer);
-        fluidSimCompute.SetTexture(externalForcesKernel, "CurlRead", curlTexture.ReadBuffer);
+        fluidSimCompute.SetTexture(externalForcesKernel, "CurlWrite", curlTexture);
 
         DispatchKernel(externalForcesKernel);
         velocityTexture.SwapBuffers();
@@ -259,13 +256,12 @@ public class ExplosionManager : MonoBehaviour
         fluidSimCompute.SetFloat("ThermalExpansion", thermalExpansion);
         fluidSimCompute.SetTexture(divergenceKernel, "VelocityRead", velocityTexture.ReadBuffer);
         fluidSimCompute.SetTexture(divergenceKernel, "SmokePropRead", smokePropTexture.ReadBuffer);
-        fluidSimCompute.SetTexture(divergenceKernel, "DivergenceWrite", divergenceTexture.WriteBuffer);
+        fluidSimCompute.SetTexture(divergenceKernel, "DivergenceWrite", divergenceTexture);
 
         DispatchKernel(divergenceKernel);
-        divergenceTexture.SwapBuffers();
 
         // Calculate pressure
-        fluidSimCompute.SetTexture(pressureKernel, "DivergenceRead", divergenceTexture.ReadBuffer);
+        fluidSimCompute.SetTexture(pressureKernel, "DivergenceWrite", divergenceTexture);
         for (int i = 0; i < pressureIterations; ++i)
         {
             fluidSimCompute.SetTexture(pressureKernel, "PressureRead", pressureTexture.ReadBuffer);
@@ -327,7 +323,7 @@ public class ExplosionManager : MonoBehaviour
         switch (debugMode)
         {
             case DebugMode.Divergence:
-                debugMat.SetTexture("_VolumeTex", divergenceTexture.ReadBuffer);
+                debugMat.SetTexture("_VolumeTex", divergenceTexture);
                 break;
             case DebugMode.Pressure:
                 debugMat.SetTexture("_VolumeTex", pressureTexture.ReadBuffer);
@@ -341,8 +337,8 @@ public class ExplosionManager : MonoBehaviour
     void OnDestroy()
     {
         smokePropTexture.ForEach(t => {if (t != null) t.Release();});
-        curlTexture.ForEach(t => {if (t != null) t.Release();});
-        divergenceTexture.ForEach(t => {if (t != null) t.Release();});
+        if (curlTexture != null) curlTexture.Release();
+        if (divergenceTexture != null) divergenceTexture.Release();
         pressureTexture.ForEach(t => {if (t != null) t.Release();});
         velocityTexture.ForEach(t => {if (t != null) t.Release();});
         if (shadowTexture != null) shadowTexture.Release();

@@ -42,10 +42,8 @@ RWTexture3D<float4> VelocityWrite;
 Texture3D<float4> VelocityRead;
 
 RWTexture3D<float4> CurlWrite;
-Texture3D<float4> CurlRead;
 
 RWTexture3D<float> DivergenceWrite;
-Texture3D<float> DivergenceRead;
 
 RWTexture3D<float> PressureWrite;
 Texture3D<float> PressureRead;
@@ -215,7 +213,7 @@ void ExternalForces(
         int3 globalPos = int3(groupId * GROUP_SIZE) + int3(pos) - int3(1, 1, 1);
         globalPos = max(int3(0, 0, 0), globalPos);
         globalPos = min(globalPos, int3(Resolution-1));
-        vorticityCache[i] = length(CurlRead[globalPos].xyz);
+        vorticityCache[i] = length(CurlWrite[globalPos].xyz);
         reactionCache[i] = SmokePropRead[globalPos].a;
     }
 
@@ -251,7 +249,7 @@ void ExternalForces(
     if (length(eta) > 0.001)
     {
         float3 N = normalize(eta);
-        float3 curl = CurlRead[id].xyz;
+        float3 curl = CurlWrite[id].xyz;
 
         float3 vorticityForce = VorticityStrength * cross(N, curl) * dx;
         vel += vorticityForce * DeltaTime;
@@ -361,7 +359,7 @@ void PressureIteration(
     float pF = pressureCache[getCacheIndex(uint3(pos + int3( 0,  0,  1)))];
 
     float dx = BoundsSize.x / float(Resolution.x);
-    float div = DivergenceRead[id];
+    float div = DivergenceWrite[id];
     PressureWrite[id] = (pL + pR + pD + pU + pB + pF - (dx * dx * div)) / 6.0;
 }
 
