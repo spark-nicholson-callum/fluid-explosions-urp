@@ -111,9 +111,12 @@ float ThermalDecay;
 float SmokeDecay;
 
 // Groupshare Cache
+// TODO // Reuse caches? With everything as seperate kernels it doesn't matter though
 groupshared float3 velCache[TOTAL_CACHE];
 groupshared float vorticityCache[TOTAL_CACHE];
 groupshared float pressureCache[TOTAL_CACHE];
+groupshared float reactionCache[TOTAL_CACHE];
+groupshared float densityCache[TOTAL_CACHE];
 
 bool insideEmitter(Emitter em, float3 pos)
 {
@@ -136,12 +139,12 @@ bool insideParticle(Particle p, float3 pos)
     return length(pos - p.position) <= p.radius;
 }
 
-uint GetCacheIndex(uint3 pos)
+uint getCacheIndex(uint3 pos)
 {
     return ((pos.z * CACHE_SIZE) + pos.y) * CACHE_SIZE + pos.x;
 }
 
-uint3 GetCachePos(uint i)
+uint3 getCachePos(uint i)
 {
     uint z = i / (CACHE_SIZE * CACHE_SIZE);
     uint y = (i / CACHE_SIZE) % CACHE_SIZE;
@@ -170,7 +173,7 @@ void ComputeCurl(
     [unroll]
     for (uint i = groupIndex; i < TOTAL_CACHE; i += TOTAL_THREADS)
     {
-        uint3 pos = GetCachePos(i);
+        uint3 pos = getCachePos(i);
         int3 globalPos = int3(groupId * GROUP_SIZE) + int3(pos) - int3(1, 1, 1);
         globalPos = max(int3(0, 0, 0), globalPos);
         globalPos = min(globalPos, int3(Resolution-1));
@@ -182,12 +185,12 @@ void ComputeCurl(
 
     uint3 pos = groupThreadId + uint3(1, 1, 1); // Offset for the padding
 
-    float3 vL = velCache[GetCacheIndex(uint3(pos + int3(-1,  0,  0)))];
-    float3 vR = velCache[GetCacheIndex(uint3(pos + int3( 1,  0,  0)))];
-    float3 vD = velCache[GetCacheIndex(uint3(pos + int3( 0, -1,  0)))];
-    float3 vU = velCache[GetCacheIndex(uint3(pos + int3( 0,  1,  0)))];
-    float3 vB = velCache[GetCacheIndex(uint3(pos + int3( 0,  0, -1)))];
-    float3 vF = velCache[GetCacheIndex(uint3(pos + int3( 0,  0,  1)))];
+    float3 vL = velCache[getCacheIndex(uint3(pos + int3(-1,  0,  0)))];
+    float3 vR = velCache[getCacheIndex(uint3(pos + int3( 1,  0,  0)))];
+    float3 vD = velCache[getCacheIndex(uint3(pos + int3( 0, -1,  0)))];
+    float3 vU = velCache[getCacheIndex(uint3(pos + int3( 0,  1,  0)))];
+    float3 vB = velCache[getCacheIndex(uint3(pos + int3( 0,  0, -1)))];
+    float3 vF = velCache[getCacheIndex(uint3(pos + int3( 0,  0,  1)))];
 
     float dx = BoundsSize.x / float(Resolution.x);
     float3 curl = float3(
@@ -208,11 +211,12 @@ void ExternalForces(
     [unroll]
     for (uint i = groupIndex; i < TOTAL_CACHE; i += TOTAL_THREADS)
     {
-        uint3 pos = GetCachePos(i);
+        uint3 pos = getCachePos(i);
         int3 globalPos = int3(groupId * GROUP_SIZE) + int3(pos) - int3(1, 1, 1);
         globalPos = max(int3(0, 0, 0), globalPos);
         globalPos = min(globalPos, int3(Resolution-1));
         vorticityCache[i] = length(CurlRead[globalPos].xyz);
+        reactionCache[i] = SmokePropRead[globalPos].a;
     }
 
     GroupMemoryBarrierWithGroupSync();
@@ -234,12 +238,12 @@ void ExternalForces(
     // Vorticity Confinement
     uint3 pos = groupThreadId + uint3(1, 1, 1); // Offset for the padding
 
-    float wL = vorticityCache[GetCacheIndex(uint3(pos + int3(-1,  0,  0)))];
-    float wR = vorticityCache[GetCacheIndex(uint3(pos + int3( 1,  0,  0)))];
-    float wD = vorticityCache[GetCacheIndex(uint3(pos + int3( 0, -1,  0)))];
-    float wU = vorticityCache[GetCacheIndex(uint3(pos + int3( 0,  1,  0)))];
-    float wB = vorticityCache[GetCacheIndex(uint3(pos + int3( 0,  0, -1)))];
-    float wF = vorticityCache[GetCacheIndex(uint3(pos + int3( 0,  0,  1)))];
+    float wL = vorticityCache[getCacheIndex(uint3(pos + int3(-1,  0,  0)))];
+    float wR = vorticityCache[getCacheIndex(uint3(pos + int3( 1,  0,  0)))];
+    float wD = vorticityCache[getCacheIndex(uint3(pos + int3( 0, -1,  0)))];
+    float wU = vorticityCache[getCacheIndex(uint3(pos + int3( 0,  1,  0)))];
+    float wB = vorticityCache[getCacheIndex(uint3(pos + int3( 0,  0, -1)))];
+    float wF = vorticityCache[getCacheIndex(uint3(pos + int3( 0,  0,  1)))];
 
     float dx = BoundsSize.x / float(Resolution.x);
     float3 eta = float3(wR - wL, wU - wD, wF - wB) / (2.0 * dx);
@@ -259,13 +263,12 @@ void ExternalForces(
     vel += curlNoise(worldPos * CurlNoiseScale, Time * CurlNoiseSpeed) * DeltaTime * CurlNoiseStrength;
 
     // Concussive Blast
-    // TODO // Cache
-    float rL = SmokePropRead[uint3(max(0, (int)id.x - 1), id.y, id.z)].a;
-    float rR = SmokePropRead[uint3(min(Resolution.x - 1, id.x + 1), id.y, id.z)].a;
-    float rD = SmokePropRead[uint3(id.x, max(0, (int)id.y - 1), id.z)].a;
-    float rU = SmokePropRead[uint3(id.x, min(Resolution.y - 1, id.y + 1), id.z)].a;
-    float rB = SmokePropRead[uint3(id.x, id.y, max(0, (int)id.z - 1))].a;
-    float rF = SmokePropRead[uint3(id.x, id.y, min(Resolution.z - 1, id.z + 1))].a;
+    float rL = reactionCache[getCacheIndex(uint3(pos + int3(-1,  0,  0)))];
+    float rR = reactionCache[getCacheIndex(uint3(pos + int3( 1,  0,  0)))];
+    float rD = reactionCache[getCacheIndex(uint3(pos + int3( 0, -1,  0)))];
+    float rU = reactionCache[getCacheIndex(uint3(pos + int3( 0,  1,  0)))];
+    float rB = reactionCache[getCacheIndex(uint3(pos + int3( 0,  0, -1)))];
+    float rF = reactionCache[getCacheIndex(uint3(pos + int3( 0,  0,  1)))];
 
     float3 reactionGradient = float3(rR - rL, rU - rD, rF - rB) / (2.0 * dx);
     vel -= ReactionExpansion * reactionGradient * DeltaTime;
@@ -283,7 +286,7 @@ void ComputeDivergence(
     [unroll]
     for (uint i = groupIndex; i < TOTAL_CACHE; i += TOTAL_THREADS)
     {
-        uint3 pos = GetCachePos(i);
+        uint3 pos = getCachePos(i);
         int3 globalPos = int3(groupId * GROUP_SIZE) + int3(pos) - int3(1, 1, 1);
         globalPos = max(int3(0, 0, 0), globalPos);
         globalPos = min(globalPos, int3(Resolution-1));
@@ -295,12 +298,12 @@ void ComputeDivergence(
 
     uint3 pos = groupThreadId + uint3(1, 1, 1); // Offset for the padding
 
-    float3 vL = velCache[GetCacheIndex(uint3(pos + int3(-1,  0,  0)))];
-    float3 vR = velCache[GetCacheIndex(uint3(pos + int3( 1,  0,  0)))];
-    float3 vD = velCache[GetCacheIndex(uint3(pos + int3( 0, -1,  0)))];
-    float3 vU = velCache[GetCacheIndex(uint3(pos + int3( 0,  1,  0)))];
-    float3 vB = velCache[GetCacheIndex(uint3(pos + int3( 0,  0, -1)))];
-    float3 vF = velCache[GetCacheIndex(uint3(pos + int3( 0,  0,  1)))];
+    float3 vL = velCache[getCacheIndex(uint3(pos + int3(-1,  0,  0)))];
+    float3 vR = velCache[getCacheIndex(uint3(pos + int3( 1,  0,  0)))];
+    float3 vD = velCache[getCacheIndex(uint3(pos + int3( 0, -1,  0)))];
+    float3 vU = velCache[getCacheIndex(uint3(pos + int3( 0,  1,  0)))];
+    float3 vB = velCache[getCacheIndex(uint3(pos + int3( 0,  0, -1)))];
+    float3 vF = velCache[getCacheIndex(uint3(pos + int3( 0,  0,  1)))];
 
     float dx = BoundsSize.x / float(Resolution.x);
     float div = ((vR.x - vL.x) + (vU.y - vD.y) + (vF.z - vB.z)) / (2.0 * dx);
@@ -339,7 +342,7 @@ void PressureIteration(
     [unroll]
     for (uint i = groupIndex; i < TOTAL_CACHE; i += TOTAL_THREADS)
     {
-        uint3 pos = GetCachePos(i);
+        uint3 pos = getCachePos(i);
         int3 globalPos = int3(groupId * GROUP_SIZE) + int3(pos) - int3(1, 1, 1);
         bool isOutside = any(globalPos < 0) || any(globalPos >= int3(Resolution));
         pressureCache[i] = isOutside ? 0.0 : PressureRead[globalPos];
@@ -350,12 +353,12 @@ void PressureIteration(
 
     uint3 pos = groupThreadId + uint3(1, 1, 1); // Offset for the padding
 
-    float pL = pressureCache[GetCacheIndex(uint3(pos + int3(-1,  0,  0)))];
-    float pR = pressureCache[GetCacheIndex(uint3(pos + int3( 1,  0,  0)))];
-    float pD = pressureCache[GetCacheIndex(uint3(pos + int3( 0, -1,  0)))];
-    float pU = pressureCache[GetCacheIndex(uint3(pos + int3( 0,  1,  0)))];
-    float pB = pressureCache[GetCacheIndex(uint3(pos + int3( 0,  0, -1)))];
-    float pF = pressureCache[GetCacheIndex(uint3(pos + int3( 0,  0,  1)))];
+    float pL = pressureCache[getCacheIndex(uint3(pos + int3(-1,  0,  0)))];
+    float pR = pressureCache[getCacheIndex(uint3(pos + int3( 1,  0,  0)))];
+    float pD = pressureCache[getCacheIndex(uint3(pos + int3( 0, -1,  0)))];
+    float pU = pressureCache[getCacheIndex(uint3(pos + int3( 0,  1,  0)))];
+    float pB = pressureCache[getCacheIndex(uint3(pos + int3( 0,  0, -1)))];
+    float pF = pressureCache[getCacheIndex(uint3(pos + int3( 0,  0,  1)))];
 
     float dx = BoundsSize.x / float(Resolution.x);
     float div = DivergenceRead[id];
@@ -372,7 +375,7 @@ void ProjectVelocity(
     [unroll]
     for (uint i = groupIndex; i < TOTAL_CACHE; i += TOTAL_THREADS)
     {
-        uint3 pos = GetCachePos(i);
+        uint3 pos = getCachePos(i);
         int3 globalPos = int3(groupId * GROUP_SIZE) + int3(pos) - int3(1, 1, 1);
         bool isOutside = any(globalPos < 0) || any(globalPos >= int3(Resolution));
         pressureCache[i] = isOutside ? 0.0 : PressureRead[globalPos];
@@ -383,12 +386,12 @@ void ProjectVelocity(
 
     uint3 pos = groupThreadId + uint3(1, 1, 1); // Offset for the padding
 
-    float pL = pressureCache[GetCacheIndex(uint3(pos + int3(-1,  0,  0)))];
-    float pR = pressureCache[GetCacheIndex(uint3(pos + int3( 1,  0,  0)))];
-    float pD = pressureCache[GetCacheIndex(uint3(pos + int3( 0, -1,  0)))];
-    float pU = pressureCache[GetCacheIndex(uint3(pos + int3( 0,  1,  0)))];
-    float pB = pressureCache[GetCacheIndex(uint3(pos + int3( 0,  0, -1)))];
-    float pF = pressureCache[GetCacheIndex(uint3(pos + int3( 0,  0,  1)))];
+    float pL = pressureCache[getCacheIndex(uint3(pos + int3(-1,  0,  0)))];
+    float pR = pressureCache[getCacheIndex(uint3(pos + int3( 1,  0,  0)))];
+    float pD = pressureCache[getCacheIndex(uint3(pos + int3( 0, -1,  0)))];
+    float pU = pressureCache[getCacheIndex(uint3(pos + int3( 0,  1,  0)))];
+    float pB = pressureCache[getCacheIndex(uint3(pos + int3( 0,  0, -1)))];
+    float pF = pressureCache[getCacheIndex(uint3(pos + int3( 0,  0,  1)))];
 
     float dx = BoundsSize.x / float(Resolution.x);
     float3 vel = VelocityRead[id].xyz;
@@ -452,9 +455,9 @@ void Step(uint3 id : SV_DispatchThreadID)
             }
         }
 
-        for (uint j = 0; j < ParticleCount; ++j)
+        for (uint ii = 0; ii < ParticleCount; ++ii)
         {
-            Particle p = Particles[j];
+            Particle p = Particles[ii];
             if (insideParticle(p, cellWorldPos))
             {
                 advectedSmokeProps.r = max(advectedSmokeProps.r, p.heat);
@@ -500,9 +503,25 @@ void Step(uint3 id : SV_DispatchThreadID)
 }
 
 [numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
-void CalculateShadows(uint3 id : SV_DispatchThreadID)
-{
+void CalculateShadows(
+    uint3 id : SV_DispatchThreadID,
+    uint3 groupId : SV_GroupID,
+    uint3 groupThreadId : SV_GroupThreadId,
+    uint groupIndex : SV_GroupIndex
+) {
+    [unroll]
+    for (uint i = groupIndex; i < TOTAL_CACHE; i += TOTAL_THREADS)
+    {
+        uint3 pos = getCachePos(i);
+        int3 globalPos = int3(groupId * GROUP_SIZE) + int3(pos) - int3(1, 1, 1);
+        globalPos = max(int3(0, 0, 0), globalPos);
+        globalPos = min(globalPos, int3(Resolution-1));
+        densityCache[i] = SmokePropRead[globalPos].g;
+    }
+
+    GroupMemoryBarrierWithGroupSync();
     if (any(id >= Resolution)) return;
+
     // +.5 to sample the center of the the voxel
     float3 uvw = ((float3(id) + 0.5) / float3(Resolution));
     float3 uvwStep = (LightDirection / BoundsSize) * ShadowStepSize;
@@ -510,7 +529,7 @@ void CalculateShadows(uint3 id : SV_DispatchThreadID)
     // Ray march to find light transmission
     float totalDensity = 0.0;
     float3 rayPos = uvw;
-    for (int i = 0; i < ShadowSteps; i++)
+    for (int ii = 0; ii < ShadowSteps; ii++)
     {
         rayPos += uvwStep;
 
@@ -524,13 +543,13 @@ void CalculateShadows(uint3 id : SV_DispatchThreadID)
     float transmission = exp(-totalDensity * ShadowStepSize * ShadowAbsorption);
 
     // Calculate gradient to act as a faux surface normal later
-    // TODO // Cache this
-    float dL = SmokePropRead[uint3(max(0, (int)id.x - 1), id.y, id.z)].g;
-    float dR = SmokePropRead[uint3(min(Resolution.x - 1, id.x +1), id.y, id.z)].g;
-    float dD = SmokePropRead[uint3(id.x, max(0, (int)id.y - 1), id.z)].g;
-    float dU = SmokePropRead[uint3(id.x, min(Resolution.y - 1, id.y +1), id.z)].g;
-    float dB = SmokePropRead[uint3(id.x, id.y, max(0, (int)id.z - 1))].g;
-    float dF = SmokePropRead[uint3(id.x, id.y, min(Resolution.z - 1, id.z +1))].g;
+    uint3 pos = groupThreadId + uint3(1, 1, 1); // Offset for the padding
+    float dL = densityCache[getCacheIndex(uint3(pos + int3(-1,  0,  0)))];
+    float dR = densityCache[getCacheIndex(uint3(pos + int3( 1,  0,  0)))];
+    float dD = densityCache[getCacheIndex(uint3(pos + int3( 0, -1,  0)))];
+    float dU = densityCache[getCacheIndex(uint3(pos + int3( 0,  1,  0)))];
+    float dB = densityCache[getCacheIndex(uint3(pos + int3( 0,  0, -1)))];
+    float dF = densityCache[getCacheIndex(uint3(pos + int3( 0,  0,  1)))];
 
     float3 normal = -normalize(float3(dR - dL, dU - dD, dF - dB) + 0.0001);
 
