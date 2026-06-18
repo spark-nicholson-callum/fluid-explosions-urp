@@ -4,6 +4,7 @@
 #define TOTAL_CACHE (CACHE_SIZE * CACHE_SIZE * CACHE_SIZE) // 1000
 
 #pragma kernel Init
+#pragma kernel InitPressure
 #pragma kernel InitMultigrid
 
 #pragma kernel ComputeCurl
@@ -12,7 +13,7 @@
 
 #pragma kernel PressureIteration
 #pragma kernel PressureResidual
-#pragma kernal PressureRestrict
+#pragma kernel PressureRestrict
 #pragma kernel PressureProlongate
 
 #pragma kernel ProjectVelocity
@@ -167,9 +168,15 @@ void Init(uint3 id : SV_DispatchThreadID)
 
     VelocityWrite[id] = float4(0.0, 0.0, 0.0, 0.0);
     CurlWrite[id] = float4(0.0, 0.0, 0.0, 0.0);
-    PressureWrite[id] = 0.0;
     SmokePropWrite[id] = float4(0.0, 0.0, 0.0, 0.0);
     ShadowWrite[id] = float4(0.0, 0.0, 0.0, 0.0);
+}
+
+[numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
+void InitPressure(uint3 id : SV_DispatchThreadID)
+{
+    if (any(id >= Resolution)) return;
+    PressureWrite[id] = 0.0;
 }
 
 [numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
@@ -178,6 +185,8 @@ void InitMultigrid(uint3 id : SV_DispatchThreadID)
     if (any(id >= Resolution)) return;
 
     DivergenceWrite[id] = 0.0;
+    PressureWrite[id] = 0.0;
+    PressureResidualWrite[id] = 0.0;
 }
 
 [numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]

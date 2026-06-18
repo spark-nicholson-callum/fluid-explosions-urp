@@ -1,10 +1,10 @@
 using System;
 
-public class ScaledBufferSet<T, TIndex>
+public class ScaledBufferSet<T, TSize>
 {
     private T[] buffers;
 
-    public ScaledBufferSet(Func<TIndex, T> generator, Func<TIndex, int, TIndex> divisionOp, TIndex size, int layers)
+    public ScaledBufferSet(Func<TSize, T> generator, Func<TSize, int, TSize> divisionOp, TSize size, int layers)
     {
         buffers = new T[layers];
 
@@ -19,8 +19,5 @@ public class ScaledBufferSet<T, TIndex>
         foreach(T buffer in buffers) action(buffer);
     }
 
-    public T Get(int layer)
-    {
-        return buffers[layer];
-    }
+    public T this[int layer] => buffers[layer];
 }
