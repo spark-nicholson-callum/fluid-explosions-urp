@@ -1,23 +1,26 @@
 using System;
 
-public class ScaledBufferSet<T, TSize>
+namespace CallumNicholson.FluidExplosionURP
 {
-    private T[] buffers;
-
-    public ScaledBufferSet(Func<TSize, T> generator, Func<TSize, int, TSize> divisionOp, TSize size, int layers)
+    public class ScaledBufferSet<T, TSize>
     {
-        buffers = new T[layers];
+        private T[] buffers;
 
-        for (int i = 0; i < layers; ++i)
+        public ScaledBufferSet(Func<TSize, T> generator, Func<TSize, int, TSize> divisionOp, TSize size, int layers)
         {
-            buffers[i] = generator(divisionOp(size, i + 1));
+            buffers = new T[layers];
+
+            for (int i = 0; i < layers; ++i)
+            {
+                buffers[i] = generator(divisionOp(size, i + 1));
+            }
         }
-    }
 
-    public void ForEach(Action<T> action)
-    {
-        foreach(T buffer in buffers) action(buffer);
-    }
+        public void ForEach(Action<T> action)
+        {
+            foreach(T buffer in buffers) action(buffer);
+        }
 
-    public T this[int layer] => buffers[layer];
+        public T this[int layer] => buffers[layer];
+    }
 }
