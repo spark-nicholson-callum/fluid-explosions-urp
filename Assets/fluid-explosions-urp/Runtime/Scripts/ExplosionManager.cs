@@ -1,5 +1,4 @@
 using System.Linq;
-using UnityEngine.InputSystem;
 using UnityEngine;
 
 public class ExplosionManager : MonoBehaviour
@@ -188,9 +187,7 @@ public class ExplosionManager : MonoBehaviour
         fluidSimCompute.SetVector("BoundsSize", bounds.size);
 
         // Emitters
-        bool spacePressed = (Keyboard.current != null && Keyboard.current.spaceKey.isPressed);
-        spacePressed = true;
-        fluidSimCompute.SetBool("IsInjecting", spacePressed);
+        fluidSimCompute.SetBool("IsInjecting", true);
 
         FluidEmitter[] emitters = transform.GetComponentsInChildren<FluidEmitter>();
         fluidSimCompute.SetInt("EmitterCount", emitters.Length);
