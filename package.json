@@ -1,0 +1,10 @@
+{
+    "name": "com.callumnicholson.fluid-explosions-urp",
+    "version": "1.0.0",
+    "displayName": "Fluid Explosions URP",
+    "unity": "6000.4",
+    "author": {
+        "name": "Callum Nicholson",
+        "email": "nicholson.callum@spark-creative.co.jp"
+    }
+}
