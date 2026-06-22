@@ -97,7 +97,7 @@ Shader "Custom/SurfaceExplosionMarch"
                 float amp = 0.5;
                 for(int i = 0; i < 3; i++)
                 {
-                    f += amp * snoise(p);
+                    f += amp * simplexNoise(p);
                     p *= 2.0;
                     amp *= 0.5;
                 }
