@@ -23,6 +23,10 @@ Material:
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
+    - _NoiseTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _ShadowTex:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
@@ -38,7 +42,7 @@ Material:
     - _HeatErrosion: 0.05
     - _MaxTemperature: 25
     - _MinTemperature: 4
-    - _NoiseScale: 2
+    - _NoiseScale: 0.8
     - _NoiseSpeed: 0.5
     - _NoiseStrength: 0.05
     - _SmokeDensityCutoff: 0.1

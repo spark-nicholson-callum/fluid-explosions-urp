@@ -2,8 +2,6 @@ Shader "Custom/SurfaceExplosionMarch"
 {
     Properties
     {
-        _VolumeTex ("Volume Texture (3D)", 3D) = "" {}
-        _ShadowTex ("Shadow Texture (3D)", 3D) = "" {}
         _StepSize ("Step Size", Range(0.01, 0.1)) = 0.02
 
         [Header(Lighting)]
@@ -46,7 +44,6 @@ Shader "Custom/SurfaceExplosionMarch"
             #pragma fragment frag
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-            #include "simplexNoise.hlsl"
 
             struct Attributes
             {
@@ -62,8 +59,13 @@ Shader "Custom/SurfaceExplosionMarch"
             };
 
             TEXTURE3D(_VolumeTex);
-            TEXTURE3D(_ShadowTex);
             SAMPLER(sampler_VolumeTex);
+
+            TEXTURE3D(_ShadowTex);
+            SAMPLER(sampler_ShadowTex);
+
+            TEXTURE3D(_NoiseTex);
+            SAMPLER(sampler_NoiseTex);
 
             CBUFFER_START(UnityPerMaterial)
                 float _StepSize;
@@ -89,19 +91,6 @@ Shader "Custom/SurfaceExplosionMarch"
             {
                 // Canonical GPU random number generator
                 return frac(sin(dot(st.xy, float2(12.9898, 78.233))) * 43758.5453123);
-            }
-
-            float fbm(float3 p)
-            {
-                float f = 0.0;
-                float amp = 0.5;
-                for(int i = 0; i < 3; i++)
-                {
-                    f += amp * simplexNoise(p);
-                    p *= 2.0;
-                    amp *= 0.5;
-                }
-                return f;
             }
 
             float3 blackbodyColor(float heat)
@@ -156,6 +145,14 @@ Shader "Custom/SurfaceExplosionMarch"
                     float heat = volumeData.r;
                     float baseDensity = volumeData.g;
 
+                    if (heat < 0.01 && baseDensity < 0.01)
+                    {
+                        // Early skip for empty space
+                        rayPos += rayDir * _StepSize;
+                        IN.worldPos += normalize(IN.worldPos - GetCameraPositionWS()) * _StepSize;
+                        continue;
+                    }
+
                     float thresh = _MinTemperature / _MaxTemperature;
                     if (heat > thresh)
                     {
@@ -171,14 +168,15 @@ Shader "Custom/SurfaceExplosionMarch"
                         break;
                     }
 
-                    float3 noiseSamplePos = (IN.worldPos * _NoiseScale) + noiseOffset;
-                    float noiseVal = fbm(noiseSamplePos);
+                    float3 noiseUvw = (IN.worldPos * _NoiseScale) + noiseOffset;
+                    float noiseVal = SAMPLE_TEXTURE3D_LOD(_NoiseTex, sampler_NoiseTex, noiseUvw, 0).r;
+
                     float heatErrosion = heat * _HeatErrosion;
                     float erodedDensity = saturate(baseDensity - heatErrosion - (noiseVal * _NoiseStrength * (1.0 - baseDensity)));
 
                     if (erodedDensity > _SmokeDensityCutoff)
                     {
-                        float4 shadowProps = SAMPLE_TEXTURE3D(_ShadowTex, sampler_VolumeTex, rayPos);
+                        float4 shadowProps = SAMPLE_TEXTURE3D(_ShadowTex, sampler_ShadowTex, rayPos);
 
                         float nDotL = dot(shadowProps.xyz, _LightDirection);
                         float diffuse = 0.5 * nDotL + 0.5;

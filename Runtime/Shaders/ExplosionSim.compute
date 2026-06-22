@@ -20,8 +20,10 @@
 #pragma kernel Step
 
 #pragma kernel CalculateShadows
+#pragma kernel GenerateNoise
 
 #include "simplexNoise.hlsl"
+#include "perlinNoise.hlsl"
 
 struct Emitter
 {
@@ -64,6 +66,7 @@ RWTexture3D<float4> SmokePropWrite;
 Texture3D<float4> SmokePropRead;
 
 RWTexture3D<float4> ShadowWrite;
+RWTexture3D<float> NoiseWrite;
 
 StructuredBuffer<Emitter> Emitters;
 uint EmitterCount;
@@ -635,4 +638,15 @@ void CalculateShadows(
     float3 normal = -normalize(float3(dR - dL, dU - dD, dF - dB) + 0.0001);
 
     ShadowWrite[id] = float4(normal, transmission);
+}
+
+[numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
+void GenerateNoise(uint3 id : SV_DispatchThreadID)
+{
+    if (any(id >= Resolution)) return;
+    // TODO // Make the period a parameter
+    float3 uvw = 8.0 * float3(id) / float3(Resolution);
+    float rawNoise = periodicPerlinNoise(uvw, float3(8.0, 8.0, 8.0));
+
+    NoiseWrite[id] = rawNoise * 0.5 + 0.5;
 }

@@ -40,6 +40,7 @@ namespace CallumNicholson.FluidExplosionURP
         [Header("Misc")]
         [SerializeField] private float thermalDecay = 0.4f;
         [SerializeField] private float smokeDecay = 0.3f;
+        [SerializeField] private Vector3Int noiseResolution = new(64, 64, 64);
 
         [Header("Lighting")]
         [SerializeField] private Light mainLight;
@@ -60,6 +61,7 @@ namespace CallumNicholson.FluidExplosionURP
         private ScaledBufferSet<RenderTexture, Vector3Int> pressureResidualTexture;
         private DoubleBuffer<RenderTexture> smokePropTexture;
         private RenderTexture shadowTexture;
+        private RenderTexture noiseTexture;
         private Material rayMarchMaterial;
 
         private ComputeBuffer emitterBuffer;
@@ -84,6 +86,7 @@ namespace CallumNicholson.FluidExplosionURP
         private int projectVelocityKernel;
         private int stepKernel;
         private int shadowKernel;
+        private int noiseKernel;
 
         private int safeMultigridStages;
         private uint threadGroupSize;
@@ -103,6 +106,7 @@ namespace CallumNicholson.FluidExplosionURP
             projectVelocityKernel    = fluidSimCompute.FindKernel("ProjectVelocity");
             stepKernel               = fluidSimCompute.FindKernel("Step");
             shadowKernel             = fluidSimCompute.FindKernel("CalculateShadows");
+            noiseKernel              = fluidSimCompute.FindKernel("GenerateNoise");
 
             fluidSimCompute.SetInts("Resolution", resolution.x, resolution.y, resolution.z);
 
@@ -130,6 +134,7 @@ namespace CallumNicholson.FluidExplosionURP
             pressureResidualTexture = new(dim => CreateVolume(RenderTextureFormat.RHalf), (a,b) => a/b, resolution, safeMultigridStages);
             smokePropTexture        = new(() => CreateVolume());
             shadowTexture           = CreateVolume();
+            noiseTexture            = CreateVolume(noiseResolution, RenderTextureFormat.RHalf);
 
             for (int i = 0; i < 2; ++i)
             {
@@ -157,17 +162,30 @@ namespace CallumNicholson.FluidExplosionURP
                 }
                 coarseRes /= 2;
             }
-            fluidSimCompute.SetInts("Resolution", resolution.x, resolution.y, resolution.z);
 
+            // Generate Noise
+            fluidSimCompute.SetInts("Resolution", noiseResolution.x, noiseResolution.y, noiseResolution.z);
+            fluidSimCompute.SetTexture(noiseKernel, "NoiseWrite", noiseTexture);
+
+            DispatchKernel(noiseKernel, noiseResolution);
+
+            // Set up for rendering
+            fluidSimCompute.SetInts("Resolution", resolution.x, resolution.y, resolution.z);
             rayMarchMaterial = GetComponent<Renderer>().material;
         }
 
         RenderTexture CreateVolume(RenderTextureFormat format = RenderTextureFormat.ARGBHalf)
         {
-            RenderTexture rt = new RenderTexture(resolution.x, resolution.y, 0, format);
+            return CreateVolume(resolution, format);
+        }
+
+        RenderTexture CreateVolume(Vector3Int res, RenderTextureFormat format = RenderTextureFormat.ARGBHalf)
+        {
+            RenderTexture rt = new RenderTexture(res.x, res.y, 0, format);
             rt.dimension = UnityEngine.Rendering.TextureDimension.Tex3D;
-            rt.volumeDepth = resolution.z;
+            rt.volumeDepth = res.z;
             rt.enableRandomWrite = true;
+            rt.wrapMode = TextureWrapMode.Repeat;
             rt.filterMode = FilterMode.Trilinear;
             rt.Create();
             return rt;
@@ -331,6 +349,7 @@ namespace CallumNicholson.FluidExplosionURP
             // Share result with ray march material for rendering
             rayMarchMaterial.SetTexture("_VolumeTex", smokePropTexture.ReadBuffer);
             rayMarchMaterial.SetTexture("_ShadowTex", shadowTexture);
+            rayMarchMaterial.SetTexture("_NoiseTex", noiseTexture);
             rayMarchMaterial.SetVector("_BoundsMin", bounds.min);
             rayMarchMaterial.SetVector("_BoundsSize", bounds.size);
             rayMarchMaterial.SetVector("_LightDirection", getLightDirection(mainLight));
@@ -460,6 +479,8 @@ namespace CallumNicholson.FluidExplosionURP
             pressureResidualTexture.ForEach(t => {if (t != null) t.Release();});
             velocityTexture.ForEach(t => {if (t != null) t.Release();});
             if (shadowTexture != null) shadowTexture.Release();
+            if (noiseTexture != null) noiseTexture.Release();
+
             if (emitterBuffer != null) emitterBuffer.Release();
             if (particleBuffer != null) particleBuffer.Release();
         }
