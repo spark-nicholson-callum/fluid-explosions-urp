@@ -21,7 +21,7 @@
 
 #pragma kernel CalculateShadows
 
-#include "noise.hlsl"
+#include "simplexNoise.hlsl"
 
 struct Emitter
 {

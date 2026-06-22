@@ -46,7 +46,7 @@ Shader "Custom/SurfaceExplosionMarch"
             #pragma fragment frag
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-            #include "noise.hlsl"
+            #include "simplexNoise.hlsl"
 
             struct Attributes
             {
