@@ -201,5 +201,80 @@ Shader "Custom/SurfaceExplosionMarch"
             }
             ENDHLSL
         }
+
+        Pass
+        {
+            Name "ShadowCaster"
+            Tags { "LightMode" = "ShadowCaster" }
+
+            ZWrite On
+            ZTest LEqual
+            ColorMask 0
+            Cull Front
+
+            HLSLPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float3 localPos : TEXCOORD0;
+                float3 localRayDir : TEXCOORD1;
+            };
+
+            TEXTURE3D(_VolumeTex);
+            SAMPLER(sampler_VolumeTex);
+
+            CBUFFER_START(UnityPerMaterial)
+                float _StepSize;
+                float _SmokeDensityCutoff;
+            CBUFFER_END
+
+            float4 _LightDirection;
+
+            Varyings vert(Attributes IN)
+            {
+                Varyings OUT;
+
+                OUT.positionCS = TransformObjectToHClip(IN.positionOS.xyz);
+                OUT.localPos = IN.positionOS.xyz;
+                OUT.localRayDir = TransformWorldToObjectDir(_LightDirection.xyz);
+
+                return OUT;
+            }
+
+            float frag(Varyings IN) : SV_Depth
+            {
+                float3 rayDir = normalize(IN.localRayDir);
+                float3 rayPos = IN.localPos;
+
+                for (int step = 0; step < 32; ++step)
+                {
+                    float3 uvw = rayPos + 0.5;
+                    if (any(uvw < 0.0) || any(uvw > 1.0)) break;
+
+                    float baseDensity = SAMPLE_TEXTURE3D_LOD(_VolumeTex, sampler_VolumeTex, uvw, 0).g;
+                    if (baseDensity > _SmokeDensityCutoff)
+                    {
+                        float4 hitClipPos = TransformObjectToHClip(rayPos);
+                        return hitClipPos.z / hitClipPos.w;
+                    }
+
+                    rayPos += rayDir * _StepSize;
+                }
+
+                discard;
+                return 0.0;
+            }
+            ENDHLSL
+        }
     }
 }
