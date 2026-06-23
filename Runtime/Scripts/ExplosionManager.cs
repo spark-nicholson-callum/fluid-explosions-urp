@@ -195,9 +195,8 @@ namespace CallumNicholson.FluidExplosionURP
         {
             Bounds bounds = GetComponent<Renderer>().bounds;
 
-            // 最低でも 30fps で動く、ラグるときは遅くなる
-            // こうしないとシミュレーションがめちゃくちゃになります。
-            float safeDeltaTime = Mathf.Min(Time.deltaTime, 1.0f / 30.0f);
+            // Limit the simulation to 90fps to stop the simulation from blowing up
+            float safeDeltaTime = Mathf.Min(Time.deltaTime, 1.0f / 60.0f);
 
             // Global parameters
             fluidSimCompute.SetFloat("Time", Time.time);

@@ -283,6 +283,12 @@ void ExternalForces(
         float3 curl = CurlWrite[id].xyz;
 
         float3 vorticityForce = VorticityStrength * cross(N, curl) * dx;
+        // TODO // Make this a parameter
+        float maxVorticityForce = 10.0;
+        if (length(vorticityForce > maxVorticityForce))
+        {
+            vorticityForce = normalize(vorticityForce) * maxVorticityForce;
+        }
         vel += vorticityForce * DeltaTime;
     }
 
@@ -493,11 +499,17 @@ void Step(uint3 id : SV_DispatchThreadID)
     float3 uvwVel = VelocityRead[id].xyz / BoundsSize;
 
     // MacCormack Advection
-    float3 backUvw = uvw - (uvwVel * DeltaTime * SimScale);
+    float maxDistance = length(1.0 / float3(Resolution));
+
+    float3 backStep = uvwVel * DeltaTime * SimScale;
+    //if (length(backStep) > maxDistance) backStep = normalize(backStep) * maxDistance;
+    float3 backUvw = uvw - backStep;
     float4 backVel = VelocityRead.SampleLevel(sampler_LinearClamp, backUvw, 0);
     float3 backUvwVel = backVel.xyz / BoundsSize;
 
-    float3 forwardUvw = backUvw + (backUvwVel * DeltaTime * SimScale);
+    float3 forwardStep = backUvwVel * DeltaTime * SimScale;
+    //if (length(forwardStep) > maxDistance) forwardStep = normalize(forwardStep) * maxDistance;
+    float3 forwardUvw = backUvw + forwardStep;
     float3 prevUvw = backUvw + (uvw - forwardUvw) / 2.0;
 
     float4 advectedSmokeProps = SmokePropRead.SampleLevel(sampler_LinearClamp, prevUvw, 0);
