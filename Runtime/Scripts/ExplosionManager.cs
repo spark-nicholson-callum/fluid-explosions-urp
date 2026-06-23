@@ -129,12 +129,12 @@ namespace CallumNicholson.FluidExplosionURP
             // Create textures
             velocityTexture         = new(() => CreateVolume());
             curlTexture             = CreateVolume();
-            divergenceTexture       = new(dim => CreateVolume(RenderTextureFormat.RHalf), (a,b) => a/b, resolution, safeMultigridStages);
-            pressureTexture         = new(dim => new(() => CreateVolume(RenderTextureFormat.RHalf)), (a,b) => a/b, resolution, safeMultigridStages);
-            pressureResidualTexture = new(dim => CreateVolume(RenderTextureFormat.RHalf), (a,b) => a/b, resolution, safeMultigridStages);
+            divergenceTexture       = new(dim => CreateVolume(RenderTextureFormat.RFloat), (a,b) => a/b, resolution, safeMultigridStages);
+            pressureTexture         = new(dim => new(() => CreateVolume(RenderTextureFormat.RFloat)), (a,b) => a/b, resolution, safeMultigridStages);
+            pressureResidualTexture = new(dim => CreateVolume(RenderTextureFormat.RFloat), (a,b) => a/b, resolution, safeMultigridStages);
             smokePropTexture        = new(() => CreateVolume());
             shadowTexture           = CreateVolume();
-            noiseTexture            = CreateVolume(noiseResolution, RenderTextureFormat.RHalf);
+            noiseTexture            = CreateVolume(noiseResolution, RenderTextureFormat.RFloat);
 
             for (int i = 0; i < 2; ++i)
             {

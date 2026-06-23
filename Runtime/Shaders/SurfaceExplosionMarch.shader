@@ -28,7 +28,7 @@ Shader "Custom/SurfaceExplosionMarch"
     {
         Tags
         {
-            "RenderPipeline" = "UniversalRenderPipeline"
+            "RenderPipeline" = "UniversalPipeline"
             "RenderType" = "Transparent"
             "Queue" = "Transparent"
         }
@@ -39,6 +39,9 @@ Shader "Custom/SurfaceExplosionMarch"
 
         Pass
         {
+            Name "ForwardLit"
+            Tags { "LightMode" = "UniversalForward" }
+
             HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
