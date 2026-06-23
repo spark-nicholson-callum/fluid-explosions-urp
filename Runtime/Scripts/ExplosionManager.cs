@@ -1,5 +1,6 @@
 using System.Linq;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace CallumNicholson.FluidExplosionURP
 {
@@ -10,6 +11,18 @@ namespace CallumNicholson.FluidExplosionURP
             Divergence,
             Pressure,
             Shadows,
+        }
+
+        public enum LogStage
+        {
+            Advection,
+            CalculateCurl,
+            ExternalForces,
+            CalculateDivergence,
+            CalculatePressure,
+            ProjectVelocity,
+            CalculateShadows,
+            NONE
         }
 
         [Header("Simulation")]
@@ -53,6 +66,7 @@ namespace CallumNicholson.FluidExplosionURP
         [SerializeField] private MeshRenderer debugQuad;
         [SerializeField][Range(0f, 1f)] public float zSlice = 0.5f;
         [SerializeField] public float debugBoost = 1.0f;
+        [SerializeField] private ExplosionManagerGpuLogger profiler = null;
 
         private DoubleBuffer<RenderTexture> velocityTexture;
         private RenderTexture curlTexture;
@@ -69,6 +83,8 @@ namespace CallumNicholson.FluidExplosionURP
 
         private ComputeBuffer particleBuffer;
         private ParticleFluidData[] particleData;
+
+        private CommandBuffer cmd;
 
         private int initKernel;
         private int initPressureKernel;
@@ -93,6 +109,8 @@ namespace CallumNicholson.FluidExplosionURP
 
         void Start()
         {
+            cmd = new();
+
             initKernel               = fluidSimCompute.FindKernel("Init");
             initPressureKernel       = fluidSimCompute.FindKernel("InitPressure");
             initMultigridKernel      = fluidSimCompute.FindKernel("InitMultigrid");
@@ -193,23 +211,25 @@ namespace CallumNicholson.FluidExplosionURP
 
         void Update()
         {
+            cmd.Clear();
+
             Bounds bounds = GetComponent<Renderer>().bounds;
 
             // Limit the simulation to 90fps to stop the simulation from blowing up
             float safeDeltaTime = Mathf.Min(Time.deltaTime, 1.0f / 60.0f);
 
             // Global parameters
-            fluidSimCompute.SetFloat("Time", Time.time);
-            fluidSimCompute.SetFloat("DeltaTime", safeDeltaTime);
-            fluidSimCompute.SetFloat("SimScale", simScale);
-            fluidSimCompute.SetVector("BoundsMin", bounds.min);
-            fluidSimCompute.SetVector("BoundsSize", bounds.size);
+            cmd.SetComputeFloatParam(fluidSimCompute, "Time", Time.time);
+            cmd.SetComputeFloatParam(fluidSimCompute, "DeltaTime", safeDeltaTime);
+            cmd.SetComputeFloatParam(fluidSimCompute, "SimScale", simScale);
+            cmd.SetComputeVectorParam(fluidSimCompute, "BoundsMin", bounds.min);
+            cmd.SetComputeVectorParam(fluidSimCompute, "BoundsSize", bounds.size);
 
             // Emitters
-            fluidSimCompute.SetBool("IsInjecting", true);
+            cmd.SetComputeIntParam(fluidSimCompute, "IsInjecting", 1);
 
             FluidEmitter[] emitters = transform.GetComponentsInChildren<FluidEmitter>();
-            fluidSimCompute.SetInt("EmitterCount", emitters.Length);
+            cmd.SetComputeIntParam(fluidSimCompute, "EmitterCount", emitters.Length);
             if (emitters.Length > 0)
             {
                 if (emitterBuffer != null && emitterBuffer.count != emitters.Length)
@@ -236,14 +256,14 @@ namespace CallumNicholson.FluidExplosionURP
                 }
                 emitterBuffer.SetData(new EmitterData[] {});
             }
-            fluidSimCompute.SetBuffer(stepKernel, "Emitters", emitterBuffer);
-            fluidSimCompute.SetBuffer(divergenceKernel, "Emitters", emitterBuffer);
+            cmd.SetComputeBufferParam(fluidSimCompute, stepKernel, "Emitters", emitterBuffer);
+            cmd.SetComputeBufferParam(fluidSimCompute, divergenceKernel, "Emitters", emitterBuffer);
 
             // Particles
             ParticleFluidData[] particles = transform.GetComponentsInChildren<FluidParticleBridge>()
                 .SelectMany(p => p.FluidData)
                 .ToArray();
-            fluidSimCompute.SetInt("ParticleCount", particles.Length);
+            cmd.SetComputeIntParam(fluidSimCompute, "ParticleCount", particles.Length);
             if (particles.Length > 0)
             {
                 if (particleBuffer != null && particleBuffer.count != particles.Length)
@@ -265,57 +285,57 @@ namespace CallumNicholson.FluidExplosionURP
                 }
                 particleBuffer.SetData(new ParticleFluidData[] {});
             }
-            fluidSimCompute.SetBuffer(stepKernel, "Particles", particleBuffer);
+            cmd.SetComputeBufferParam(fluidSimCompute, stepKernel, "Particles", particleBuffer);
 
             // Advection Step
-            fluidSimCompute.SetTexture(stepKernel, "SmokePropRead", smokePropTexture.ReadBuffer);
-            fluidSimCompute.SetTexture(stepKernel, "SmokePropWrite", smokePropTexture.WriteBuffer);
-            fluidSimCompute.SetTexture(stepKernel, "VelocityRead", velocityTexture.ReadBuffer);
-            fluidSimCompute.SetTexture(stepKernel, "VelocityWrite", velocityTexture.WriteBuffer);
+            cmd.SetComputeTextureParam(fluidSimCompute, stepKernel, "SmokePropRead", smokePropTexture.ReadBuffer);
+            cmd.SetComputeTextureParam(fluidSimCompute, stepKernel, "SmokePropWrite", smokePropTexture.WriteBuffer);
+            cmd.SetComputeTextureParam(fluidSimCompute, stepKernel, "VelocityRead", velocityTexture.ReadBuffer);
+            cmd.SetComputeTextureParam(fluidSimCompute, stepKernel, "VelocityWrite", velocityTexture.WriteBuffer);
 
-            fluidSimCompute.SetFloat("IgnitionTemp", ignitionTemp);
-            fluidSimCompute.SetFloat("BurnRate", burnRate);
-            fluidSimCompute.SetFloat("SmokeEmission", smokeEmission);
-            fluidSimCompute.SetFloat("HeatEmission", heatEmission);
-            fluidSimCompute.SetFloat("BurnExpansion", burnExpansion);
-            fluidSimCompute.SetFloat("SmokeChoke", smokeChoke);
+            cmd.SetComputeFloatParam(fluidSimCompute, "IgnitionTemp", ignitionTemp);
+            cmd.SetComputeFloatParam(fluidSimCompute, "BurnRate", burnRate);
+            cmd.SetComputeFloatParam(fluidSimCompute, "SmokeEmission", smokeEmission);
+            cmd.SetComputeFloatParam(fluidSimCompute, "HeatEmission", heatEmission);
+            cmd.SetComputeFloatParam(fluidSimCompute, "BurnExpansion", burnExpansion);
+            cmd.SetComputeFloatParam(fluidSimCompute, "SmokeChoke", smokeChoke);
 
-            fluidSimCompute.SetFloat("ThermalDecay", thermalDecay);
-            fluidSimCompute.SetFloat("SmokeDecay", smokeDecay);
+            cmd.SetComputeFloatParam(fluidSimCompute, "ThermalDecay", thermalDecay);
+            cmd.SetComputeFloatParam(fluidSimCompute, "SmokeDecay", smokeDecay);
 
-            DispatchKernel(stepKernel, resolution);
+            DispatchKernel(stepKernel, resolution, LogStage.Advection);
             smokePropTexture.SwapBuffers();
             velocityTexture.SwapBuffers();
 
             // Calculate Curl
-            fluidSimCompute.SetTexture(curlKernel, "VelocityRead", velocityTexture.ReadBuffer);
-            fluidSimCompute.SetTexture(curlKernel, "CurlWrite", curlTexture);
+            cmd.SetComputeTextureParam(fluidSimCompute, curlKernel, "VelocityRead", velocityTexture.ReadBuffer);
+            cmd.SetComputeTextureParam(fluidSimCompute, curlKernel, "CurlWrite", curlTexture);
 
-            DispatchKernel(curlKernel, resolution);
+            DispatchKernel(curlKernel, resolution, LogStage.CalculateCurl);
 
             // Apply external forces
-            fluidSimCompute.SetFloat("Buoyancy", buoyancyStrength);
-            fluidSimCompute.SetFloat("SmokeWeight", smokeWeight);
-            fluidSimCompute.SetFloat("VorticityStrength", vorticityStrength);
-            fluidSimCompute.SetFloat("CurlNoiseScale", curlNoiseScale);
-            fluidSimCompute.SetFloat("CurlNoiseSpeed", curlNoiseSpeed);
-            fluidSimCompute.SetFloat("CurlNoiseStrength", curlNoiseStrength);
-            fluidSimCompute.SetFloat("ReactionExpansion", reactionExpansion);
-            fluidSimCompute.SetTexture(externalForcesKernel, "VelocityRead", velocityTexture.ReadBuffer);
-            fluidSimCompute.SetTexture(externalForcesKernel, "VelocityWrite", velocityTexture.WriteBuffer);
-            fluidSimCompute.SetTexture(externalForcesKernel, "SmokePropRead", smokePropTexture.ReadBuffer);
-            fluidSimCompute.SetTexture(externalForcesKernel, "CurlWrite", curlTexture);
+            cmd.SetComputeFloatParam(fluidSimCompute, "Buoyancy", buoyancyStrength);
+            cmd.SetComputeFloatParam(fluidSimCompute, "SmokeWeight", smokeWeight);
+            cmd.SetComputeFloatParam(fluidSimCompute, "VorticityStrength", vorticityStrength);
+            cmd.SetComputeFloatParam(fluidSimCompute, "CurlNoiseScale", curlNoiseScale);
+            cmd.SetComputeFloatParam(fluidSimCompute, "CurlNoiseSpeed", curlNoiseSpeed);
+            cmd.SetComputeFloatParam(fluidSimCompute, "CurlNoiseStrength", curlNoiseStrength);
+            cmd.SetComputeFloatParam(fluidSimCompute, "ReactionExpansion", reactionExpansion);
+            cmd.SetComputeTextureParam(fluidSimCompute, externalForcesKernel, "VelocityRead", velocityTexture.ReadBuffer);
+            cmd.SetComputeTextureParam(fluidSimCompute, externalForcesKernel, "VelocityWrite", velocityTexture.WriteBuffer);
+            cmd.SetComputeTextureParam(fluidSimCompute, externalForcesKernel, "SmokePropRead", smokePropTexture.ReadBuffer);
+            cmd.SetComputeTextureParam(fluidSimCompute, externalForcesKernel, "CurlWrite", curlTexture);
 
-            DispatchKernel(externalForcesKernel, resolution);
+            DispatchKernel(externalForcesKernel, resolution, LogStage.ExternalForces);
             velocityTexture.SwapBuffers();
 
             // Calculate divergence
-            fluidSimCompute.SetFloat("ThermalExpansion", thermalExpansion);
-            fluidSimCompute.SetTexture(divergenceKernel, "VelocityRead", velocityTexture.ReadBuffer);
-            fluidSimCompute.SetTexture(divergenceKernel, "SmokePropRead", smokePropTexture.ReadBuffer);
-            fluidSimCompute.SetTexture(divergenceKernel, "DivergenceWrite", divergenceTexture[0]);
+            cmd.SetComputeFloatParam(fluidSimCompute, "ThermalExpansion", thermalExpansion);
+            cmd.SetComputeTextureParam(fluidSimCompute, divergenceKernel, "VelocityRead", velocityTexture.ReadBuffer);
+            cmd.SetComputeTextureParam(fluidSimCompute, divergenceKernel, "SmokePropRead", smokePropTexture.ReadBuffer);
+            cmd.SetComputeTextureParam(fluidSimCompute, divergenceKernel, "DivergenceWrite", divergenceTexture[0]);
 
-            DispatchKernel(divergenceKernel, resolution);
+            DispatchKernel(divergenceKernel, resolution, LogStage.CalculateDivergence);
 
             // Calculate pressure
             if (safeMultigridStages > 1)
@@ -328,22 +348,24 @@ namespace CallumNicholson.FluidExplosionURP
             }
 
             // Project Velocity
-            fluidSimCompute.SetTexture(projectVelocityKernel, "PressureRead", pressureTexture[0].ReadBuffer);
-            fluidSimCompute.SetTexture(projectVelocityKernel, "VelocityRead", velocityTexture.ReadBuffer);
-            fluidSimCompute.SetTexture(projectVelocityKernel, "VelocityWrite", velocityTexture.WriteBuffer);
+            cmd.SetComputeTextureParam(fluidSimCompute, projectVelocityKernel, "PressureRead", pressureTexture[0].ReadBuffer);
+            cmd.SetComputeTextureParam(fluidSimCompute, projectVelocityKernel, "VelocityRead", velocityTexture.ReadBuffer);
+            cmd.SetComputeTextureParam(fluidSimCompute, projectVelocityKernel, "VelocityWrite", velocityTexture.WriteBuffer);
 
-            DispatchKernel(projectVelocityKernel, resolution);
+            DispatchKernel(projectVelocityKernel, resolution, LogStage.ProjectVelocity);
             velocityTexture.SwapBuffers();
 
             // Calculate Shadows
-            fluidSimCompute.SetVector("LightDirection", getLightDirection(mainLight));
-            fluidSimCompute.SetFloat("ShadowStepSize", shadowStepSize);
-            fluidSimCompute.SetFloat("ShadowAbsorption", shadowAbsorption);
-            fluidSimCompute.SetFloat("ShadowSteps", shadowSteps);
-            fluidSimCompute.SetTexture(shadowKernel, "SmokePropRead", smokePropTexture.ReadBuffer);
-            fluidSimCompute.SetTexture(shadowKernel, "ShadowWrite", shadowTexture);
+            cmd.SetComputeVectorParam(fluidSimCompute, "LightDirection", getLightDirection(mainLight));
+            cmd.SetComputeFloatParam(fluidSimCompute, "ShadowStepSize", shadowStepSize);
+            cmd.SetComputeFloatParam(fluidSimCompute, "ShadowAbsorption", shadowAbsorption);
+            cmd.SetComputeFloatParam(fluidSimCompute, "ShadowSteps", shadowSteps);
+            cmd.SetComputeTextureParam(fluidSimCompute, shadowKernel, "SmokePropRead", smokePropTexture.ReadBuffer);
+            cmd.SetComputeTextureParam(fluidSimCompute, shadowKernel, "ShadowWrite", shadowTexture);
 
-            DispatchKernel(shadowKernel, resolution);
+            DispatchKernel(shadowKernel, resolution, LogStage.CalculateShadows);
+
+            Graphics.ExecuteCommandBuffer(cmd);
 
             // Share result with ray march material for rendering
             rayMarchMaterial.SetTexture("_VolumeTex", smokePropTexture.ReadBuffer);
@@ -360,34 +382,36 @@ namespace CallumNicholson.FluidExplosionURP
         {
             Vector3Int res = resolution;
 
+            if (profiler != null) profiler.Begin(LogStage.CalculatePressure, cmd);
+
             // Descent
             for (int level = 0; level < safeMultigridStages - 1; ++level)
             {
                 int fineLevel = level;
                 int coarseLevel = level + 1;
 
-                fluidSimCompute.SetInts("Resolution", res.x, res.y, res.z);
+                cmd.SetComputeIntParams(fluidSimCompute, "Resolution", res.x, res.y, res.z);
 
                 // Pre-Smooth
                 RunPressureJacobi(res, fineLevel, pressureIterations);
 
                 // Residual
-                fluidSimCompute.SetTexture(pressureResidualKernel, "PressureRead", pressureTexture[fineLevel].ReadBuffer);
-                fluidSimCompute.SetTexture(pressureResidualKernel, "DivergenceWrite", divergenceTexture[fineLevel]);
-                fluidSimCompute.SetTexture(pressureResidualKernel, "PressureResidualWrite", pressureResidualTexture[fineLevel]);
+                cmd.SetComputeTextureParam(fluidSimCompute, pressureResidualKernel, "PressureRead", pressureTexture[fineLevel].ReadBuffer);
+                cmd.SetComputeTextureParam(fluidSimCompute, pressureResidualKernel, "DivergenceWrite", divergenceTexture[fineLevel]);
+                cmd.SetComputeTextureParam(fluidSimCompute, pressureResidualKernel, "PressureResidualWrite", pressureResidualTexture[fineLevel]);
                 DispatchKernel(pressureResidualKernel, res);
 
                 // Swap to coarse resolution
                 res /= 2;
-                fluidSimCompute.SetInts("Resolution", res.x, res.y, res.z);
+                cmd.SetComputeIntParams(fluidSimCompute, "Resolution", res.x, res.y, res.z);
 
                 // Restrict
-                fluidSimCompute.SetTexture(pressureRestrictKernel, "PressureResidualRead", pressureResidualTexture[fineLevel]);
-                fluidSimCompute.SetTexture(pressureRestrictKernel, "DivergenceWrite", divergenceTexture[coarseLevel]);
+                cmd.SetComputeTextureParam(fluidSimCompute, pressureRestrictKernel, "PressureResidualRead", pressureResidualTexture[fineLevel]);
+                cmd.SetComputeTextureParam(fluidSimCompute, pressureRestrictKernel, "DivergenceWrite", divergenceTexture[coarseLevel]);
                 DispatchKernel(pressureRestrictKernel, res);
 
                 // Clear coarse pressure read buffer
-                fluidSimCompute.SetTexture(initPressureKernel, "PressureWrite", pressureTexture[coarseLevel].ReadBuffer);
+                cmd.SetComputeTextureParam(fluidSimCompute, initPressureKernel, "PressureWrite", pressureTexture[coarseLevel].ReadBuffer);
                 DispatchKernel(initPressureKernel, res);
             }
 
@@ -402,11 +426,11 @@ namespace CallumNicholson.FluidExplosionURP
 
                 // Switch to fine resolution
                 res *= 2;
-                fluidSimCompute.SetInts("Resolution", res.x, res.y, res.z);
+                cmd.SetComputeIntParams(fluidSimCompute, "Resolution", res.x, res.y, res.z);
 
                 // Prolongate
-                fluidSimCompute.SetTexture(pressureProlongateKernel, "PressureRead", pressureTexture[coarseLevel].ReadBuffer);
-                fluidSimCompute.SetTexture(pressureProlongateKernel, "PressureWrite", pressureTexture[fineLevel].ReadBuffer);
+                cmd.SetComputeTextureParam(fluidSimCompute, pressureProlongateKernel, "PressureRead", pressureTexture[coarseLevel].ReadBuffer);
+                cmd.SetComputeTextureParam(fluidSimCompute, pressureProlongateKernel, "PressureWrite", pressureTexture[fineLevel].ReadBuffer);
                 DispatchKernel(pressureProlongateKernel, res);
 
                 // Post-Smooth
@@ -414,17 +438,19 @@ namespace CallumNicholson.FluidExplosionURP
             }
 
             // Reset resolution explicitly
-            fluidSimCompute.SetInts("Resolution", resolution.x, resolution.y, resolution.z);
+            cmd.SetComputeIntParams(fluidSimCompute, "Resolution", resolution.x, resolution.y, resolution.z);
+
+            if (profiler != null) profiler.End(LogStage.CalculatePressure, cmd);
         }
 
         void RunPressureJacobi(Vector3Int res, int level, int iterations)
         {
-            fluidSimCompute.SetInts("Resolution", res.x, res.y, res.z);
-            fluidSimCompute.SetTexture(pressureKernel, "DivergenceWrite", divergenceTexture[0]);
+            cmd.SetComputeIntParams(fluidSimCompute, "Resolution", res.x, res.y, res.z);
+            cmd.SetComputeTextureParam(fluidSimCompute, pressureKernel, "DivergenceWrite", divergenceTexture[0]);
             for (int i = 0; i < iterations; ++i)
             {
-                fluidSimCompute.SetTexture(pressureKernel, "PressureRead", pressureTexture[level].ReadBuffer);
-                fluidSimCompute.SetTexture(pressureKernel, "PressureWrite", pressureTexture[level].WriteBuffer);
+                cmd.SetComputeTextureParam(fluidSimCompute, pressureKernel, "PressureRead", pressureTexture[level].ReadBuffer);
+                cmd.SetComputeTextureParam(fluidSimCompute, pressureKernel, "PressureWrite", pressureTexture[level].WriteBuffer);
 
                 DispatchKernel(pressureKernel, res);
                 pressureTexture[level].SwapBuffers();
@@ -437,12 +463,21 @@ namespace CallumNicholson.FluidExplosionURP
             return -light.transform.forward;
         }
 
-        void DispatchKernel(int kernel, Vector3Int res)
+        void DispatchKernel(int kernel, Vector3Int res, LogStage stage = LogStage.NONE)
         {
             int x = (res.x + (int)threadGroupSize - 1) / (int)threadGroupSize;
             int y = (res.y + (int)threadGroupSize - 1) / (int)threadGroupSize;
             int z = (res.z + (int)threadGroupSize - 1) / (int)threadGroupSize;
-            fluidSimCompute.Dispatch(kernel, x, y, z);
+
+            if (stage != LogStage.NONE && profiler != null)
+            {
+                profiler.Begin(stage, cmd);
+            }
+            cmd.DispatchCompute(fluidSimCompute, kernel, x, y, z);
+            if (stage != LogStage.NONE && profiler != null)
+            {
+                profiler.End(stage, cmd);
+            }
         }
 
         void DrawDebug()
@@ -471,6 +506,7 @@ namespace CallumNicholson.FluidExplosionURP
 
         void OnDestroy()
         {
+            if (cmd != null) cmd.Release();
             smokePropTexture.ForEach(t => {if (t != null) t.Release();});
             if (curlTexture != null) curlTexture.Release();
             divergenceTexture.ForEach(t => {if (t != null) t.Release();});
