@@ -141,7 +141,7 @@ Shader "Custom/SurfaceExplosionMarch"
                     if (any(rayPos < 0) || any(rayPos > 1)) break;
 
                     // URP texture sampling macro
-                    float4 volumeData = SAMPLE_TEXTURE3D(_VolumeTex, sampler_VolumeTex, rayPos);
+                    float4 volumeData = SAMPLE_TEXTURE3D_LOD(_VolumeTex, sampler_VolumeTex, rayPos, 0);
                     float heat = volumeData.r;
                     float baseDensity = volumeData.g;
 
@@ -162,7 +162,7 @@ Shader "Custom/SurfaceExplosionMarch"
 
                         // Sample below the surface
                         float3 samplePos = saturate(surfPos + (rayDir * (_StepSize * _FireSurfaceDepth)));
-                        float sampleHeat = SAMPLE_TEXTURE3D(_VolumeTex, sampler_VolumeTex, samplePos).r;
+                        float sampleHeat = SAMPLE_TEXTURE3D_LOD(_VolumeTex, sampler_VolumeTex, samplePos, 0).r;
 
                         finalColor = float4(blackbodyColor(sampleHeat), 1.0);
                         break;
@@ -176,7 +176,7 @@ Shader "Custom/SurfaceExplosionMarch"
 
                     if (erodedDensity > _SmokeDensityCutoff)
                     {
-                        float4 shadowProps = SAMPLE_TEXTURE3D(_ShadowTex, sampler_ShadowTex, rayPos);
+                        float4 shadowProps = SAMPLE_TEXTURE3D_LOD(_ShadowTex, sampler_ShadowTex, rayPos, 0);
 
                         float nDotL = dot(shadowProps.xyz, _LightDirection);
                         float diffuse = 0.5 * nDotL + 0.5;
