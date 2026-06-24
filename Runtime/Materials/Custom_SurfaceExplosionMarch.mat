@@ -46,7 +46,7 @@ Material:
     - _NoiseSpeed: 0.5
     - _NoiseStrength: 0.05
     - _SmokeDensityCutoff: 0.1
-    - _StepSize: 0.02
+    - _StepSize: 0.025
     m_Colors:
     - _AmbientColor: {r: 0.14999998, g: 0.19999996, b: 0.24999997, a: 1}
     - _SmokeAlbedo: {r: 0.396, g: 0.396, b: 0.396, a: 1}

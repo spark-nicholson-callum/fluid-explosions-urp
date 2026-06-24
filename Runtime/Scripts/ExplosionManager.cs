@@ -152,7 +152,7 @@ namespace CallumNicholson.FluidExplosionURP
             pressureResidualTexture = new(dim => CreateVolume(RenderTextureFormat.RFloat), (a,b) => a/b, resolution, safeMultigridStages);
             smokePropTexture        = new(() => CreateVolume());
             shadowTexture           = CreateVolume();
-            noiseTexture            = CreateVolume(noiseResolution, RenderTextureFormat.RFloat);
+            noiseTexture            = CreateVolume(noiseResolution, RenderTextureFormat.RFloat, TextureWrapMode.Repeat);
 
             for (int i = 0; i < 2; ++i)
             {
@@ -192,18 +192,23 @@ namespace CallumNicholson.FluidExplosionURP
             rayMarchMaterial = GetComponent<Renderer>().material;
         }
 
-        RenderTexture CreateVolume(RenderTextureFormat format = RenderTextureFormat.ARGBHalf)
-        {
-            return CreateVolume(resolution, format);
+        RenderTexture CreateVolume(
+            RenderTextureFormat format = RenderTextureFormat.ARGBHalf,
+            TextureWrapMode wrapMode = TextureWrapMode.Clamp
+        ) {
+            return CreateVolume(resolution, format, wrapMode);
         }
 
-        RenderTexture CreateVolume(Vector3Int res, RenderTextureFormat format = RenderTextureFormat.ARGBHalf)
-        {
+        RenderTexture CreateVolume(
+            Vector3Int res,
+            RenderTextureFormat format = RenderTextureFormat.ARGBHalf,
+            TextureWrapMode wrapMode = TextureWrapMode.Clamp
+        ) {
             RenderTexture rt = new RenderTexture(res.x, res.y, 0, format);
             rt.dimension = UnityEngine.Rendering.TextureDimension.Tex3D;
             rt.volumeDepth = res.z;
             rt.enableRandomWrite = true;
-            rt.wrapMode = TextureWrapMode.Repeat;
+            rt.wrapMode = wrapMode;
             rt.filterMode = FilterMode.Trilinear;
             rt.Create();
             return rt;
