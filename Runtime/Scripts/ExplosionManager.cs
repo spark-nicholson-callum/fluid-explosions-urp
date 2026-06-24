@@ -208,6 +208,7 @@ namespace CallumNicholson.FluidExplosionURP
             rt.dimension = UnityEngine.Rendering.TextureDimension.Tex3D;
             rt.volumeDepth = res.z;
             rt.enableRandomWrite = true;
+            rt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R16G16B16A16_SFloat;
             rt.wrapMode = wrapMode;
             rt.filterMode = FilterMode.Trilinear;
             rt.Create();
