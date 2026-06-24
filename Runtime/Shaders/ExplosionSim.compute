@@ -530,8 +530,9 @@ void Step(uint3 id : SV_DispatchThreadID)
 
     advectedSmokeProps = clamp(advectedSmokeProps, minSmokeProps, maxSmokeProps);
 
-    // Temp dampening, air resistance should be a thing but we should be more precise
-    advectedVel *= 0.99;
+    // TODO // Make this a parameter
+    float AirResistance = 0.6;
+    advectedVel *= max(0.0, 1.0 - AirResistance * DeltaTime);
 
     if (IsInjecting)
     {
