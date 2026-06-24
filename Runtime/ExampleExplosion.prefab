@@ -49,7 +49,7 @@ MonoBehaviour:
   density: 1
   heat: 2
   fuel: 0
-  expansion: 3
+  expansion: 4
   drawGizmo: 1
   gizmoColor: {r: 0.121568635, g: 0.7058824, b: 0.72156864, a: 0.5019608}
 --- !u!1 &4130321176286400293
@@ -453,7 +453,7 @@ ParticleSystem:
     startSize:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 0.6
+      scalar: 0.5
       minScalar: 1
       maxCurve:
         serializedVersion: 2
@@ -506,7 +506,7 @@ ParticleSystem:
     startSizeY:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 0.6
+      scalar: 0.5
       minScalar: 1
       maxCurve:
         serializedVersion: 2
@@ -559,7 +559,7 @@ ParticleSystem:
     startSizeZ:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 0.6
+      scalar: 0.5
       minScalar: 1
       maxCurve:
         serializedVersion: 2
@@ -5206,7 +5206,7 @@ BoxCollider:
   m_LayerOverridePriority: 0
   m_IsTrigger: 0
   m_ProvidesContacts: 0
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
@@ -5227,19 +5227,19 @@ MonoBehaviour:
   simScale: 1
   pressureIterations: 2
   multigridStages: 4
-  buoyancyStrength: 15
-  smokeWeight: 3
+  buoyancyStrength: 12
+  smokeWeight: 4
   vorticityStrength: 4
   curlNoiseScale: 0.7
   curlNoiseSpeed: 0.5
   curlNoiseStrength: 0.4
   ignitionTemp: 0.5
-  burnRate: 4
-  smokeEmission: 4
-  heatEmission: 6
-  burnExpansion: 200
-  thermalExpansion: 0.4
-  reactionExpansion: 1.5
+  burnRate: 3.5
+  smokeEmission: 3.5
+  heatEmission: 5
+  burnExpansion: 180
+  thermalExpansion: 0.5
+  reactionExpansion: 1.4
   smokeChoke: 20
   thermalDecay: 1.5
   smokeDecay: 0.25
@@ -5252,3 +5252,4 @@ MonoBehaviour:
   debugQuad: {fileID: 8259977081219490555}
   zSlice: 0.5
   debugBoost: 1
+  profiler: {fileID: 0}

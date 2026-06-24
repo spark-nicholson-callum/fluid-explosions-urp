@@ -25,6 +25,7 @@ namespace CallumNicholson.FluidExplosionURP
         }
 
         [SerializeField] private TextMeshProUGUI outText;
+        [SerializeField] private T[] ignore;
 
         private Dictionary<T, SampleRecordPair> recorders;
 
@@ -32,6 +33,7 @@ namespace CallumNicholson.FluidExplosionURP
         {
             recorders = Enum.GetValues(typeof(T))
                 .Cast<T>()
+                .Where(stage => !ignore.Contains(stage))
                 .ToDictionary(
                     stage => stage,
                     stage => new SampleRecordPair(stage.ToString())
@@ -43,7 +45,10 @@ namespace CallumNicholson.FluidExplosionURP
             if (outText == null) return;
 
             StringBuilder builder = new();
-            foreach (T step in Enum.GetValues(typeof(T)).Cast<T>())
+            var stages = Enum.GetValues(typeof(T))
+                .Cast<T>()
+                .Where(stage => !ignore.Contains(stage));
+            foreach (T step in stages)
             {
                 SampleRecordPair recorder = recorders[step];
                 float timeMs = recorder.recorder.gpuElapsedNanoseconds / 1000000f;
@@ -55,9 +60,8 @@ namespace CallumNicholson.FluidExplosionURP
                 {
                     builder.AppendLine($"{step.ToString()}: {timeMs:F3} ms");
                 }
-
-                outText.text = builder.ToString();
             }
+            outText.text = builder.ToString();
         }
 
         public void Begin(T stage, CommandBuffer cmd)
