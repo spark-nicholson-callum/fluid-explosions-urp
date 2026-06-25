@@ -6,6 +6,7 @@
 #pragma kernel Init
 #pragma kernel InitPressure
 #pragma kernel InitMultigrid
+#pragma kernel InitInjection
 
 #pragma kernel ComputeCurl
 #pragma kernel ExternalForces
@@ -52,7 +53,6 @@ RWTexture3D<float4> VelocityWrite;
 Texture3D<float4> VelocityRead;
 
 RWTexture3D<float4> CurlWrite;
-
 RWTexture3D<float> DivergenceWrite;
 
 RWTexture3D<float> PressureWrite;
@@ -67,6 +67,14 @@ Texture3D<float4> SmokePropRead;
 
 RWTexture3D<float4> ShadowWrite;
 RWTexture3D<float> NoiseWrite;
+
+RWTexture3D<int> InjHeatWrite;
+RWTexture3D<int> InjSmokeWrite;
+RWTexture3D<int> InjFuelWrite;
+RWTexture3D<int> InjExpansionWrite;
+RWTexture3D<int> InjVelocityXWrite;
+RWTexture3D<int> InjVelocityYWrite;
+RWTexture3D<int> InjVelocityZWrite;
 
 StructuredBuffer<Emitter> Emitters;
 uint EmitterCount;
@@ -85,6 +93,7 @@ SamplerState sampler_LinearClamp
 float Time;
 float DeltaTime;
 uint3 Resolution;
+float InjectionScale;
 
 // World Space
 float3 BoundsMin;
@@ -190,6 +199,20 @@ void InitMultigrid(uint3 id : SV_DispatchThreadID)
     DivergenceWrite[id] = 0.0;
     PressureWrite[id] = 0.0;
     PressureResidualWrite[id] = 0.0;
+}
+
+[numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
+void InitInjection(uint3 id : SV_DispatchThreadID)
+{
+    if (any(id >= Resolution)) return;
+
+    InjHeatWrite[id]      = 0;
+    InjSmokeWrite[id]     = 0;
+    InjFuelWrite[id]      = 0;
+    InjExpansionWrite[id] = 0;
+    InjVelocityXWrite[id] = 0;
+    InjVelocityYWrite[id] = 0;
+    InjVelocityZWrite[id] = 0;
 }
 
 [numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
