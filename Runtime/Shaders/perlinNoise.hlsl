@@ -1,6 +1,8 @@
 /*
- * 3D Perlin Noise based on Stefan Gustavsons implementation.
- * His implementation is licensed under the MIT license:
+ * 3D Perlin Noise based on Stefan Gustavsons implementation:
+ * https://github.com/ashima/webgl-noise/blob/master/src/classicnoise3D.glsl
+ *
+ * Which is licensed under the MIT license:
  * * Copyright (C) 2011 by Ashima Arts (Simplex noise)
  * * Copyright (C) 2011-2016 by Stefan Gustavson (Classic noise and others)
  * *

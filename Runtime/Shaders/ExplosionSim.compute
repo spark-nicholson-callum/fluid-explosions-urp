@@ -25,7 +25,7 @@
 #pragma kernel GenerateNoise
 
 #include "simplexNoise.hlsl"
-#include "perlinNoise.hlsl"
+#include "worleyNoise.hlsl"
 
 struct Emitter
 {
@@ -736,9 +736,25 @@ void CalculateShadows(
 void GenerateNoise(uint3 id : SV_DispatchThreadID)
 {
     if (any(id >= Resolution)) return;
-    // TODO // Make the period a parameter
-    float3 uvw = 8.0 * float3(id) / float3(Resolution);
-    float rawNoise = periodicPerlinNoise(uvw, float3(8.0, 8.0, 8.0));
+    // TODO // Make these parameters
+    float period = 8.0;
+    int octaves = 8;
 
-    NoiseWrite[id] = rawNoise * 0.5 + 0.5;
+    float totalNoise = 0.0;
+    float amplitude = 0.5;
+    float maxAmplitude = 0.0;
+
+    float3 uvw = float3(id) / float3(Resolution);
+    for (int i = 0; i < octaves; ++i)
+    {
+        float rawNoise = 1.0 - periodicWorleyNoise(period * uvw, float3(period, period, period)).y;
+
+        totalNoise += rawNoise * amplitude;
+        maxAmplitude += amplitude;
+
+        period *= 2.0;
+        amplitude *= 0.5;
+    }
+
+    NoiseWrite[id] = totalNoise / maxAmplitude;
 }

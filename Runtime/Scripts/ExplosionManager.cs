@@ -11,6 +11,7 @@ namespace CallumNicholson.FluidExplosionURP
             Divergence,
             Pressure,
             Shadows,
+            Noise,
         }
 
         public enum LogStage
@@ -217,6 +218,9 @@ namespace CallumNicholson.FluidExplosionURP
             fluidSimCompute.SetTexture(noiseKernel, "NoiseWrite", noiseTexture);
 
             DispatchKernel(noiseKernel, noiseResolution);
+
+            Graphics.ExecuteCommandBuffer(cmd);
+            cmd.Clear();
 
             // Set up for rendering
             fluidSimCompute.SetInts("Resolution", resolution.x, resolution.y, resolution.z);
@@ -573,6 +577,9 @@ namespace CallumNicholson.FluidExplosionURP
                     break;
                 case DebugMode.Shadows:
                     debugMat.SetTexture("_VolumeTex", shadowTexture);
+                    break;
+                case DebugMode.Noise:
+                    debugMat.SetTexture("_VolumeTex", noiseTexture);
                     break;
             }
         }

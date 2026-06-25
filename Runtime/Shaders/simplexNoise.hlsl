@@ -3,6 +3,7 @@
  *
  * In particular this is based on:
  * https://github.com/ashima/webgl-noise/blob/master/src/noise3D.glsl
+ *
  * Which is licensed under the MIT license:
  * * Copyright (C) 2011 by Ashima Arts (Simplex noise)
  * * Copyright (C) 2011-2016 by Stefan Gustavson (Classic noise and others)
