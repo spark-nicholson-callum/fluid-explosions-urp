@@ -8,6 +8,7 @@
 #pragma kernel InitMultigrid
 #pragma kernel InitInjection
 
+#pragma kernel RasterizeParticles
 #pragma kernel ComputeCurl
 #pragma kernel ExternalForces
 #pragma kernel ComputeDivergence
@@ -253,6 +254,49 @@ void ComputeCurl(
     CurlWrite[id] = float4(curl, 0.0);
 }
 
+[numthreads(64, 1, 1)]
+void RasterizeParticles(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= ParticleCount) return;
+    Particle p = Particles[id.x];
+
+    float3 uvw = (p.position - BoundsMin) / BoundsSize;
+
+    float3 particlePos = uvw * float3(Resolution);
+    float3 particleRadius = (p.radius / BoundsSize.x) * Resolution.x;
+
+    int3 minBox = max(0, int3(particlePos - particleRadius));
+    int3 maxBox = min(int3(Resolution - 1), int3(particlePos + particleRadius));
+
+    int intHeat = (int)(p.heat * InjectionScale);
+    int intSmoke = (int)(p.density * InjectionScale);
+    int intFuel = (int)(p.fuel * InjectionScale);
+    int3 intVel = int3(p.velocity * InjectionScale);
+
+    // Loop over space
+    for (int x = minBox.x; x <= maxBox.x; ++x)
+    {
+        for (int y = minBox.y; y <= maxBox.y; ++y)
+        {
+            for (int z = minBox.z; z <= maxBox.z; ++z)
+            {
+                uint3 pos = uint3(x, y, z);
+
+                float3 cellWorldPos = BoundsMin + ((float3(pos) + 0.5) / float3(Resolution) * BoundsSize);
+                if (insideParticle(p, cellWorldPos))
+                {
+                    InterlockedMax(InjHeatWrite[pos], intHeat);
+                    InterlockedMax(InjSmokeWrite[pos], intSmoke);
+                    InterlockedMax(InjFuelWrite[pos], intFuel);
+                    InterlockedMax(InjVelocityXWrite[pos], intVel.x);
+                    InterlockedMax(InjVelocityYWrite[pos], intVel.y);
+                    InterlockedMax(InjVelocityZWrite[pos], intVel.z);
+                }
+            }
+        }
+    }
+}
+
 [numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
 void ExternalForces(
     uint3 id : SV_DispatchThreadID,
@@ -368,6 +412,8 @@ void ComputeDivergence(
 
     if (IsInjecting)
     {
+        // TODO // Rasterize the emitters as well!
+
         // +.5 to sample the center of the the voxel
         float3 uvw = (float3(id) + 0.5) / float3(Resolution);
         float3 worldPos = BoundsMin + (uvw * BoundsSize);
@@ -561,6 +607,7 @@ void Step(uint3 id : SV_DispatchThreadID)
     {
         float3 cellWorldPos = BoundsMin + (uvw * BoundsSize);
 
+        // TODO // Rasterize the emitters as well!
         for (uint i = 0; i < EmitterCount; ++i)
         {
             Emitter em = Emitters[i];
@@ -575,17 +622,18 @@ void Step(uint3 id : SV_DispatchThreadID)
             }
         }
 
-        for (uint ii = 0; ii < ParticleCount; ++ii)
-        {
-            Particle p = Particles[ii];
-            if (insideParticle(p, cellWorldPos))
-            {
-                advectedSmokeProps.r = max(advectedSmokeProps.r, p.heat);
-                advectedSmokeProps.g = max(advectedSmokeProps.g, p.density);
-                advectedSmokeProps.b = max(advectedSmokeProps.b, p.fuel);
+        float injHeat  = float(InjHeatWrite[id] / InjectionScale);
+        float injSmoke = float(InjSmokeWrite[id] / InjectionScale);
+        float injFuel = float(InjFuelWrite[id] / InjectionScale);
+        float3 injVel = float3(InjVelocityXWrite[id], InjVelocityYWrite[id], InjVelocityZWrite[id]) / InjectionScale;
 
-                advectedVel.xyz = p.velocity;
-            }
+        advectedSmokeProps.r = max(advectedSmokeProps.r, injHeat);
+        advectedSmokeProps.g = max(advectedSmokeProps.g, injSmoke);
+        advectedSmokeProps.b = max(advectedSmokeProps.b, injFuel);
+
+        if (length(injVel) > 0.0)
+        {
+            advectedVel.xyz = injVel;
         }
     }
 

@@ -16,6 +16,7 @@ namespace CallumNicholson.FluidExplosionURP
         public enum LogStage
         {
             ClearInjection,
+            RasterizeParticles,
             Advection,
             CalculateCurl,
             ExternalForces,
@@ -29,6 +30,7 @@ namespace CallumNicholson.FluidExplosionURP
         [Header("Simulation")]
         [SerializeField] private ComputeShader fluidSimCompute;
         [SerializeField] private Vector3Int resolution = new(64, 64, 64);
+        [SerializeField] private float injectionScale = 1000.0f;
         [SerializeField] private float simScale = 1.0f;
         [SerializeField] private int pressureIterations = 40;
         [SerializeField] private int multigridStages = 8;
@@ -101,6 +103,8 @@ namespace CallumNicholson.FluidExplosionURP
         private int initMultigridKernel;
         private int initInjectionKernel;
 
+        private int rasterizeParticlesKernel;
+
         private int curlKernel;
         private int externalForcesKernel;
         private int divergenceKernel;
@@ -126,13 +130,18 @@ namespace CallumNicholson.FluidExplosionURP
             initPressureKernel       = fluidSimCompute.FindKernel("InitPressure");
             initMultigridKernel      = fluidSimCompute.FindKernel("InitMultigrid");
             initInjectionKernel      = fluidSimCompute.FindKernel("InitInjection");
+
+            rasterizeParticlesKernel = fluidSimCompute.FindKernel("RasterizeParticles");
+
             curlKernel               = fluidSimCompute.FindKernel("ComputeCurl");
             externalForcesKernel     = fluidSimCompute.FindKernel("ExternalForces");
             divergenceKernel         = fluidSimCompute.FindKernel("ComputeDivergence");
+
             pressureKernel           = fluidSimCompute.FindKernel("PressureIteration");
             pressureResidualKernel   = fluidSimCompute.FindKernel("PressureResidual");
             pressureRestrictKernel   = fluidSimCompute.FindKernel("PressureRestrict");
             pressureProlongateKernel = fluidSimCompute.FindKernel("PressureProlongate");
+
             projectVelocityKernel    = fluidSimCompute.FindKernel("ProjectVelocity");
             stepKernel               = fluidSimCompute.FindKernel("Step");
             shadowKernel             = fluidSimCompute.FindKernel("CalculateShadows");
@@ -268,6 +277,7 @@ namespace CallumNicholson.FluidExplosionURP
             cmd.SetComputeFloatParam(fluidSimCompute, "SimScale", simScale);
             cmd.SetComputeVectorParam(fluidSimCompute, "BoundsMin", bounds.min);
             cmd.SetComputeVectorParam(fluidSimCompute, "BoundsSize", bounds.size);
+            cmd.SetComputeFloatParam(fluidSimCompute, "InjectionScale", injectionScale);
 
             cmd.SetComputeTextureParam(fluidSimCompute, initInjectionKernel, "InjHeatWrite", injHeatTexture);
             cmd.SetComputeTextureParam(fluidSimCompute, initInjectionKernel, "InjSmokeWrite", injSmokeTexture);
@@ -338,13 +348,39 @@ namespace CallumNicholson.FluidExplosionURP
                 }
                 particleBuffer.SetData(new ParticleFluidData[] {});
             }
-            cmd.SetComputeBufferParam(fluidSimCompute, stepKernel, "Particles", particleBuffer);
+
+            // Inject Particles
+            cmd.SetComputeBufferParam(fluidSimCompute, rasterizeParticlesKernel, "Particles", particleBuffer);
+
+            cmd.SetComputeTextureParam(fluidSimCompute, rasterizeParticlesKernel, "InjHeatWrite", injHeatTexture);
+            cmd.SetComputeTextureParam(fluidSimCompute, rasterizeParticlesKernel, "InjSmokeWrite", injSmokeTexture);
+            cmd.SetComputeTextureParam(fluidSimCompute, rasterizeParticlesKernel, "InjFuelWrite", injFuelTexture);
+            cmd.SetComputeTextureParam(fluidSimCompute, rasterizeParticlesKernel, "InjExpansionWrite", injExpansionTexture);
+            cmd.SetComputeTextureParam(fluidSimCompute, rasterizeParticlesKernel, "InjVelocityXWrite", injVelocityXTexture);
+            cmd.SetComputeTextureParam(fluidSimCompute, rasterizeParticlesKernel, "InjVelocityYWrite", injVelocityYTexture);
+            cmd.SetComputeTextureParam(fluidSimCompute, rasterizeParticlesKernel, "InjVelocityZWrite", injVelocityZTexture);
+            if (profiler != null) profiler.Begin(LogStage.RasterizeParticles, cmd);
+            // TODO // *Should* really poll the compute buffer for the thread group size, but eh
+            int particleThreadGroups = (particles.Length + 64 - 1) / 64;
+            if (particleThreadGroups < 1) particleThreadGroups = 1;
+            cmd.DispatchCompute(fluidSimCompute, rasterizeParticlesKernel, particleThreadGroups, 1, 1);
+            if (profiler != null) profiler.End(LogStage.RasterizeParticles, cmd);
 
             // Advection Step
+            cmd.SetComputeBufferParam(fluidSimCompute, stepKernel, "Particles", particleBuffer);
+
             cmd.SetComputeTextureParam(fluidSimCompute, stepKernel, "SmokePropRead", smokePropTexture.ReadBuffer);
             cmd.SetComputeTextureParam(fluidSimCompute, stepKernel, "SmokePropWrite", smokePropTexture.WriteBuffer);
             cmd.SetComputeTextureParam(fluidSimCompute, stepKernel, "VelocityRead", velocityTexture.ReadBuffer);
             cmd.SetComputeTextureParam(fluidSimCompute, stepKernel, "VelocityWrite", velocityTexture.WriteBuffer);
+
+            cmd.SetComputeTextureParam(fluidSimCompute, stepKernel, "InjHeatWrite", injHeatTexture);
+            cmd.SetComputeTextureParam(fluidSimCompute, stepKernel, "InjSmokeWrite", injSmokeTexture);
+            cmd.SetComputeTextureParam(fluidSimCompute, stepKernel, "InjFuelWrite", injFuelTexture);
+            cmd.SetComputeTextureParam(fluidSimCompute, stepKernel, "InjExpansionWrite", injExpansionTexture);
+            cmd.SetComputeTextureParam(fluidSimCompute, stepKernel, "InjVelocityXWrite", injVelocityXTexture);
+            cmd.SetComputeTextureParam(fluidSimCompute, stepKernel, "InjVelocityYWrite", injVelocityYTexture);
+            cmd.SetComputeTextureParam(fluidSimCompute, stepKernel, "InjVelocityZWrite", injVelocityZTexture);
 
             cmd.SetComputeFloatParam(fluidSimCompute, "IgnitionTemp", ignitionTemp);
             cmd.SetComputeFloatParam(fluidSimCompute, "BurnRate", burnRate);
