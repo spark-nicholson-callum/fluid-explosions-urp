@@ -69,13 +69,13 @@ Texture3D<float4> SmokePropRead;
 RWTexture3D<float4> ShadowWrite;
 RWTexture3D<float> NoiseWrite;
 
-RWTexture3D<int> InjHeatWrite;
-RWTexture3D<int> InjSmokeWrite;
-RWTexture3D<int> InjFuelWrite;
-RWTexture3D<int> InjExpansionWrite;
-RWTexture3D<int> InjVelocityXWrite;
-RWTexture3D<int> InjVelocityYWrite;
-RWTexture3D<int> InjVelocityZWrite;
+RWStructuredBuffer<int> InjHeatWrite;
+RWStructuredBuffer<int> InjSmokeWrite;
+RWStructuredBuffer<int> InjFuelWrite;
+RWStructuredBuffer<int> InjExpansionWrite;
+RWStructuredBuffer<int> InjVelocityXWrite;
+RWStructuredBuffer<int> InjVelocityYWrite;
+RWStructuredBuffer<int> InjVelocityZWrite;
 
 StructuredBuffer<Emitter> Emitters;
 uint EmitterCount;
@@ -139,6 +139,11 @@ groupshared float vorticityCache[TOTAL_CACHE];
 groupshared float pressureCache[TOTAL_CACHE];
 groupshared float reactionCache[TOTAL_CACHE];
 groupshared float densityCache[TOTAL_CACHE];
+
+uint getFlatIndex(uint3 pos)
+{
+    return (pos.z * Resolution.y + pos.y) * Resolution.x + pos.x;
+}
 
 bool insideEmitter(Emitter em, float3 pos)
 {
@@ -207,13 +212,14 @@ void InitInjection(uint3 id : SV_DispatchThreadID)
 {
     if (any(id >= Resolution)) return;
 
-    InjHeatWrite[id]      = 0;
-    InjSmokeWrite[id]     = 0;
-    InjFuelWrite[id]      = 0;
-    InjExpansionWrite[id] = 0;
-    InjVelocityXWrite[id] = 0;
-    InjVelocityYWrite[id] = 0;
-    InjVelocityZWrite[id] = 0;
+    uint flatIndex = getFlatIndex(id);
+    InjHeatWrite[flatIndex]      = 0;
+    InjSmokeWrite[flatIndex]     = 0;
+    InjFuelWrite[flatIndex]      = 0;
+    InjExpansionWrite[flatIndex] = 0;
+    InjVelocityXWrite[flatIndex] = 0;
+    InjVelocityYWrite[flatIndex] = 0;
+    InjVelocityZWrite[flatIndex] = 0;
 }
 
 [numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
@@ -285,12 +291,13 @@ void RasterizeParticles(uint3 id : SV_DispatchThreadID)
                 float3 cellWorldPos = BoundsMin + ((float3(pos) + 0.5) / float3(Resolution) * BoundsSize);
                 if (insideParticle(p, cellWorldPos))
                 {
-                    InterlockedMax(InjHeatWrite[pos], intHeat);
-                    InterlockedMax(InjSmokeWrite[pos], intSmoke);
-                    InterlockedMax(InjFuelWrite[pos], intFuel);
-                    InterlockedMax(InjVelocityXWrite[pos], intVel.x);
-                    InterlockedMax(InjVelocityYWrite[pos], intVel.y);
-                    InterlockedMax(InjVelocityZWrite[pos], intVel.z);
+                    uint flatIndex = getFlatIndex(pos);
+                    InterlockedMax(InjHeatWrite[flatIndex], intHeat);
+                    InterlockedMax(InjSmokeWrite[flatIndex], intSmoke);
+                    InterlockedMax(InjFuelWrite[flatIndex], intFuel);
+                    InterlockedMax(InjVelocityXWrite[flatIndex], intVel.x);
+                    InterlockedMax(InjVelocityYWrite[flatIndex], intVel.y);
+                    InterlockedMax(InjVelocityZWrite[flatIndex], intVel.z);
                 }
             }
         }
@@ -622,10 +629,11 @@ void Step(uint3 id : SV_DispatchThreadID)
             }
         }
 
-        float injHeat  = float(InjHeatWrite[id] / InjectionScale);
-        float injSmoke = float(InjSmokeWrite[id] / InjectionScale);
-        float injFuel = float(InjFuelWrite[id] / InjectionScale);
-        float3 injVel = float3(InjVelocityXWrite[id], InjVelocityYWrite[id], InjVelocityZWrite[id]) / InjectionScale;
+        uint flatIndex = getFlatIndex(id);
+        float injHeat  = float(InjHeatWrite[flatIndex] / InjectionScale);
+        float injSmoke = float(InjSmokeWrite[flatIndex] / InjectionScale);
+        float injFuel = float(InjFuelWrite[flatIndex] / InjectionScale);
+        float3 injVel = float3(InjVelocityXWrite[flatIndex], InjVelocityYWrite[flatIndex], InjVelocityZWrite[flatIndex]) / InjectionScale;
 
         advectedSmokeProps.r = max(advectedSmokeProps.r, injHeat);
         advectedSmokeProps.g = max(advectedSmokeProps.g, injSmoke);

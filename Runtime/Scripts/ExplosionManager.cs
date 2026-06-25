@@ -80,13 +80,13 @@ namespace CallumNicholson.FluidExplosionURP
         private RenderTexture shadowTexture;
         private RenderTexture noiseTexture;
 
-        private RenderTexture injHeatTexture;
-        private RenderTexture injSmokeTexture;
-        private RenderTexture injFuelTexture;
-        private RenderTexture injExpansionTexture;
-        private RenderTexture injVelocityXTexture;
-        private RenderTexture injVelocityYTexture;
-        private RenderTexture injVelocityZTexture;
+        private ComputeBuffer injHeatBuffer;
+        private ComputeBuffer injSmokeBuffer;
+        private ComputeBuffer injFuelBuffer;
+        private ComputeBuffer injExpansionBuffer;
+        private ComputeBuffer injVelocityXBuffer;
+        private ComputeBuffer injVelocityYBuffer;
+        private ComputeBuffer injVelocityZBuffer;
 
         private Material rayMarchMaterial;
 
@@ -175,13 +175,15 @@ namespace CallumNicholson.FluidExplosionURP
             shadowTexture           = CreateVolume();
             noiseTexture            = CreateVolume(noiseResolution, RenderTextureFormat.RFloat, TextureWrapMode.Repeat);
 
-            injHeatTexture          = CreateIntVolume();
-            injSmokeTexture         = CreateIntVolume();
-            injFuelTexture          = CreateIntVolume();
-            injExpansionTexture     = CreateIntVolume();
-            injVelocityXTexture     = CreateIntVolume();
-            injVelocityYTexture     = CreateIntVolume();
-            injVelocityZTexture     = CreateIntVolume();
+            int totalVoxels = resolution.x * resolution.y * resolution.z;
+            int stride = sizeof(int);
+            injHeatBuffer      = new ComputeBuffer(totalVoxels, stride);
+            injSmokeBuffer     = new ComputeBuffer(totalVoxels, stride);
+            injFuelBuffer      = new ComputeBuffer(totalVoxels, stride);
+            injExpansionBuffer = new ComputeBuffer(totalVoxels, stride);
+            injVelocityXBuffer = new ComputeBuffer(totalVoxels, stride);
+            injVelocityYBuffer = new ComputeBuffer(totalVoxels, stride);
+            injVelocityZBuffer = new ComputeBuffer(totalVoxels, stride);
 
             for (int i = 0; i < 2; ++i)
             {
@@ -244,24 +246,6 @@ namespace CallumNicholson.FluidExplosionURP
             return rt;
         }
 
-        RenderTexture CreateIntVolume()
-        {
-            return CreateIntVolume(resolution);
-        }
-
-        RenderTexture CreateIntVolume(Vector3Int res)
-        {
-            RenderTexture rt = new RenderTexture(res.x, res.y, 0, RenderTextureFormat.RInt);
-            rt.dimension = UnityEngine.Rendering.TextureDimension.Tex3D;
-            rt.volumeDepth = res.z;
-            rt.enableRandomWrite = true;
-            rt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R32_SInt;
-            rt.wrapMode = TextureWrapMode.Clamp;
-            rt.filterMode = FilterMode.Point;
-            rt.Create();
-            return rt;
-        }
-
         void Update()
         {
             cmd.Clear();
@@ -279,13 +263,13 @@ namespace CallumNicholson.FluidExplosionURP
             cmd.SetComputeVectorParam(fluidSimCompute, "BoundsSize", bounds.size);
             cmd.SetComputeFloatParam(fluidSimCompute, "InjectionScale", injectionScale);
 
-            cmd.SetComputeTextureParam(fluidSimCompute, initInjectionKernel, "InjHeatWrite", injHeatTexture);
-            cmd.SetComputeTextureParam(fluidSimCompute, initInjectionKernel, "InjSmokeWrite", injSmokeTexture);
-            cmd.SetComputeTextureParam(fluidSimCompute, initInjectionKernel, "InjFuelWrite", injFuelTexture);
-            cmd.SetComputeTextureParam(fluidSimCompute, initInjectionKernel, "InjExpansionWrite", injExpansionTexture);
-            cmd.SetComputeTextureParam(fluidSimCompute, initInjectionKernel, "InjVelocityXWrite", injVelocityXTexture);
-            cmd.SetComputeTextureParam(fluidSimCompute, initInjectionKernel, "InjVelocityYWrite", injVelocityYTexture);
-            cmd.SetComputeTextureParam(fluidSimCompute, initInjectionKernel, "InjVelocityZWrite", injVelocityZTexture);
+            cmd.SetComputeBufferParam(fluidSimCompute, initInjectionKernel, "InjHeatWrite", injHeatBuffer);
+            cmd.SetComputeBufferParam(fluidSimCompute, initInjectionKernel, "InjSmokeWrite", injSmokeBuffer);
+            cmd.SetComputeBufferParam(fluidSimCompute, initInjectionKernel, "InjFuelWrite", injFuelBuffer);
+            cmd.SetComputeBufferParam(fluidSimCompute, initInjectionKernel, "InjExpansionWrite", injExpansionBuffer);
+            cmd.SetComputeBufferParam(fluidSimCompute, initInjectionKernel, "InjVelocityXWrite", injVelocityXBuffer);
+            cmd.SetComputeBufferParam(fluidSimCompute, initInjectionKernel, "InjVelocityYWrite", injVelocityYBuffer);
+            cmd.SetComputeBufferParam(fluidSimCompute, initInjectionKernel, "InjVelocityZWrite", injVelocityZBuffer);
             DispatchKernel(initInjectionKernel, resolution, LogStage.ClearInjection);
 
             // Emitters
@@ -352,13 +336,13 @@ namespace CallumNicholson.FluidExplosionURP
             // Inject Particles
             cmd.SetComputeBufferParam(fluidSimCompute, rasterizeParticlesKernel, "Particles", particleBuffer);
 
-            cmd.SetComputeTextureParam(fluidSimCompute, rasterizeParticlesKernel, "InjHeatWrite", injHeatTexture);
-            cmd.SetComputeTextureParam(fluidSimCompute, rasterizeParticlesKernel, "InjSmokeWrite", injSmokeTexture);
-            cmd.SetComputeTextureParam(fluidSimCompute, rasterizeParticlesKernel, "InjFuelWrite", injFuelTexture);
-            cmd.SetComputeTextureParam(fluidSimCompute, rasterizeParticlesKernel, "InjExpansionWrite", injExpansionTexture);
-            cmd.SetComputeTextureParam(fluidSimCompute, rasterizeParticlesKernel, "InjVelocityXWrite", injVelocityXTexture);
-            cmd.SetComputeTextureParam(fluidSimCompute, rasterizeParticlesKernel, "InjVelocityYWrite", injVelocityYTexture);
-            cmd.SetComputeTextureParam(fluidSimCompute, rasterizeParticlesKernel, "InjVelocityZWrite", injVelocityZTexture);
+            cmd.SetComputeBufferParam(fluidSimCompute, rasterizeParticlesKernel, "InjHeatWrite", injHeatBuffer);
+            cmd.SetComputeBufferParam(fluidSimCompute, rasterizeParticlesKernel, "InjSmokeWrite", injSmokeBuffer);
+            cmd.SetComputeBufferParam(fluidSimCompute, rasterizeParticlesKernel, "InjFuelWrite", injFuelBuffer);
+            cmd.SetComputeBufferParam(fluidSimCompute, rasterizeParticlesKernel, "InjExpansionWrite", injExpansionBuffer);
+            cmd.SetComputeBufferParam(fluidSimCompute, rasterizeParticlesKernel, "InjVelocityXWrite", injVelocityXBuffer);
+            cmd.SetComputeBufferParam(fluidSimCompute, rasterizeParticlesKernel, "InjVelocityYWrite", injVelocityYBuffer);
+            cmd.SetComputeBufferParam(fluidSimCompute, rasterizeParticlesKernel, "InjVelocityZWrite", injVelocityZBuffer);
             if (profiler != null) profiler.Begin(LogStage.RasterizeParticles, cmd);
             // TODO // *Should* really poll the compute buffer for the thread group size, but eh
             int particleThreadGroups = (particles.Length + 64 - 1) / 64;
@@ -374,13 +358,13 @@ namespace CallumNicholson.FluidExplosionURP
             cmd.SetComputeTextureParam(fluidSimCompute, stepKernel, "VelocityRead", velocityTexture.ReadBuffer);
             cmd.SetComputeTextureParam(fluidSimCompute, stepKernel, "VelocityWrite", velocityTexture.WriteBuffer);
 
-            cmd.SetComputeTextureParam(fluidSimCompute, stepKernel, "InjHeatWrite", injHeatTexture);
-            cmd.SetComputeTextureParam(fluidSimCompute, stepKernel, "InjSmokeWrite", injSmokeTexture);
-            cmd.SetComputeTextureParam(fluidSimCompute, stepKernel, "InjFuelWrite", injFuelTexture);
-            cmd.SetComputeTextureParam(fluidSimCompute, stepKernel, "InjExpansionWrite", injExpansionTexture);
-            cmd.SetComputeTextureParam(fluidSimCompute, stepKernel, "InjVelocityXWrite", injVelocityXTexture);
-            cmd.SetComputeTextureParam(fluidSimCompute, stepKernel, "InjVelocityYWrite", injVelocityYTexture);
-            cmd.SetComputeTextureParam(fluidSimCompute, stepKernel, "InjVelocityZWrite", injVelocityZTexture);
+            cmd.SetComputeBufferParam(fluidSimCompute, stepKernel, "InjHeatWrite", injHeatBuffer);
+            cmd.SetComputeBufferParam(fluidSimCompute, stepKernel, "InjSmokeWrite", injSmokeBuffer);
+            cmd.SetComputeBufferParam(fluidSimCompute, stepKernel, "InjFuelWrite", injFuelBuffer);
+            cmd.SetComputeBufferParam(fluidSimCompute, stepKernel, "InjExpansionWrite", injExpansionBuffer);
+            cmd.SetComputeBufferParam(fluidSimCompute, stepKernel, "InjVelocityXWrite", injVelocityXBuffer);
+            cmd.SetComputeBufferParam(fluidSimCompute, stepKernel, "InjVelocityYWrite", injVelocityYBuffer);
+            cmd.SetComputeBufferParam(fluidSimCompute, stepKernel, "InjVelocityZWrite", injVelocityZBuffer);
 
             cmd.SetComputeFloatParam(fluidSimCompute, "IgnitionTemp", ignitionTemp);
             cmd.SetComputeFloatParam(fluidSimCompute, "BurnRate", burnRate);
@@ -605,13 +589,13 @@ namespace CallumNicholson.FluidExplosionURP
             if (shadowTexture != null) shadowTexture.Release();
             if (noiseTexture != null) noiseTexture.Release();
 
-            if (injHeatTexture != null) injHeatTexture.Release();
-            if (injSmokeTexture != null) injSmokeTexture.Release();
-            if (injFuelTexture != null) injFuelTexture.Release();
-            if (injExpansionTexture != null) injExpansionTexture.Release();
-            if (injVelocityXTexture != null) injVelocityXTexture.Release();
-            if (injVelocityYTexture != null) injVelocityYTexture.Release();
-            if (injVelocityZTexture != null) injVelocityZTexture.Release();
+            if (injHeatBuffer != null) injHeatBuffer.Release();
+            if (injSmokeBuffer != null) injSmokeBuffer.Release();
+            if (injFuelBuffer != null) injFuelBuffer.Release();
+            if (injExpansionBuffer != null) injExpansionBuffer.Release();
+            if (injVelocityXBuffer != null) injVelocityXBuffer.Release();
+            if (injVelocityYBuffer != null) injVelocityYBuffer.Release();
+            if (injVelocityZBuffer != null) injVelocityZBuffer.Release();
 
             if (emitterBuffer != null) emitterBuffer.Release();
             if (particleBuffer != null) particleBuffer.Release();
