@@ -129,10 +129,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ExplosionManager
   fluidSimCompute: {fileID: 7200000, guid: e216cbea8501e1f4a88c169fe10897d9, type: 3}
   resolution: {x: 96, y: 48, z: 96}
+  injectionScale: 1000
   simScale: 1
   pressureIterations: 2
   multigridStages: 4
-  buoyancyStrength: 13.5
+  buoyancyStrength: 8
   smokeWeight: 4
   vorticityStrength: 4
   curlNoiseScale: 0.7
@@ -146,8 +147,8 @@ MonoBehaviour:
   thermalExpansion: 0.5
   reactionExpansion: 1.4
   smokeChoke: 20
-  thermalDecay: 10
-  smokeDecay: 2.5
+  thermalDecay: 8
+  smokeDecay: 0.8
   noiseResolution: {x: 64, y: 64, z: 64}
   mainLight: {fileID: 0}
   shadowStepSize: 0.05
@@ -5008,7 +5009,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: CallumNicholson.FluidExplosionsURP.Runtime::CallumNicholson.FluidExplosionURP.FluidParticleBridge
   velocityMultiplier: 0.2
-  heatMultiplier: 4
+  heatMultiplier: 3
   densityMultiplier: 1
   fuelMultiplier: 1
 --- !u!1 &8774310604818272117

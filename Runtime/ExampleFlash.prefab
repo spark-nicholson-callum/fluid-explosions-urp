@@ -130,6 +130,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ExplosionManager
   fluidSimCompute: {fileID: 7200000, guid: e216cbea8501e1f4a88c169fe10897d9, type: 3}
   resolution: {x: 64, y: 64, z: 64}
+  injectionScale: 1000
   simScale: 1
   pressureIterations: 2
   multigridStages: 4
@@ -148,7 +149,7 @@ MonoBehaviour:
   reactionExpansion: 0.5
   smokeChoke: 20
   thermalDecay: 5
-  smokeDecay: 0.5
+  smokeDecay: 0.25
   noiseResolution: {x: 64, y: 64, z: 64}
   mainLight: {fileID: 0}
   shadowStepSize: 0.05

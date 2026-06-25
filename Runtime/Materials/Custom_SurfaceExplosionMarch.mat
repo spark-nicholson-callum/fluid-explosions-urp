@@ -37,9 +37,10 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _DensityScale: 180
     - _EmissionIntensity: 25
     - _FireSurfaceDepth: 1.5
-    - _HeatErrosion: 0.05
+    - _HeatErrosion: 0
     - _MaxTemperature: 25
     - _MinTemperature: 4
     - _NoiseScale: 0.8

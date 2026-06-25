@@ -14,7 +14,7 @@ Shader "Custom/SurfaceExplosionMarch"
         _NoiseStrength ("Noise Strength", Range(0.0, 2.0)) = 1.0
         _NoiseSpeed ("Noise Animation Speed", Float) = 0.5
 
-        [Header(Temprature Settings)]
+        [Header(Temperature Settings)]
         _MinTemperature ("Minimum Temperature", Float) = 10.0
         _MaxTemperature ("Maximum Temperature", Float) = 30.0
         _EmissionIntensity ("Emission Intensity", Float) = 10.0
@@ -23,6 +23,7 @@ Shader "Custom/SurfaceExplosionMarch"
         _FireSurfaceDepth ("Fire Surface Depth", Float) = 1.0
         _SmokeDensityCutoff("Smoke Density Cutoff", Float) = 0.1
         _HeatErrosion("Heat Errosion", Float) = 0.1
+        _DensityScale("Density Scale", Float) = 25.0
     }
     SubShader
     {
@@ -88,6 +89,7 @@ Shader "Custom/SurfaceExplosionMarch"
                 float _FireSurfaceDepth;
                 float _SmokeDensityCutoff;
                 float _HeatErrosion;
+                float _DensityScale;
             CBUFFER_END
 
             float random(float2 st)
@@ -167,7 +169,11 @@ Shader "Custom/SurfaceExplosionMarch"
                         float3 samplePos = saturate(surfPos + (rayDir * (_StepSize * _FireSurfaceDepth)));
                         float sampleHeat = SAMPLE_TEXTURE3D_LOD(_VolumeTex, sampler_VolumeTex, samplePos, 0).r;
 
-                        finalColor = float4(blackbodyColor(sampleHeat), 1.0);
+                        float3 fireColor = float4(blackbodyColor(sampleHeat), 1.0);
+
+                        // Blend accumulated smoke over the fire
+                        finalColor.rgb += fireColor * (1.0 - finalColor.a);
+                        finalColor.a = 1.0;
                         break;
                     }
 
@@ -189,9 +195,13 @@ Shader "Custom/SurfaceExplosionMarch"
                         float3 totalLight  = directLight + _AmbientColor.rgb;
                         float3 smokeColor = _SmokeAlbedo.rgb * totalLight;
 
-                        finalColor = float4(smokeColor, 1.0);
-                        break;
+                        // Beer's law for smoke alpha
+                        float stepAlpha = 1.0 - exp(-erodedDensity * _DensityScale * _StepSize);
+                        float4 stepColor = float4(smokeColor * stepAlpha, stepAlpha);
+                        finalColor += stepColor * (1.0 - finalColor.a);
                     }
+
+                    if (finalColor.a > 0.99) break;
 
                     prevHeat = heat;
                     prevRayPos = rayPos;

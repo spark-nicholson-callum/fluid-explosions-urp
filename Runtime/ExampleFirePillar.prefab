@@ -193,7 +193,7 @@ Transform:
   m_GameObject: {fileID: 4411220330388191903}
   serializedVersion: 2
   m_LocalRotation: {x: -0.70710695, y: -0, z: -0, w: 0.70710665}
-  m_LocalPosition: {x: 0, y: -0.215, z: 0}
+  m_LocalPosition: {x: 0, y: -0.25700003, z: 0}
   m_LocalScale: {x: 0.9, y: 0.9, z: 1.22}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -5093,7 +5093,7 @@ MonoBehaviour:
   velocityMultiplier: 0.2
   heatMultiplier: 1
   densityMultiplier: 0
-  fuelMultiplier: 0.6
+  fuelMultiplier: 0.8
 --- !u!1 &7425400904144511772
 GameObject:
   m_ObjectHideFlags: 0
@@ -5224,6 +5224,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ExplosionManager
   fluidSimCompute: {fileID: 7200000, guid: e216cbea8501e1f4a88c169fe10897d9, type: 3}
   resolution: {x: 40, y: 96, z: 40}
+  injectionScale: 1000
   simScale: 1
   pressureIterations: 2
   multigridStages: 4
@@ -5242,7 +5243,7 @@ MonoBehaviour:
   reactionExpansion: 1.4
   smokeChoke: 20
   thermalDecay: 1.5
-  smokeDecay: 0.25
+  smokeDecay: 0.15
   noiseResolution: {x: 64, y: 64, z: 64}
   mainLight: {fileID: 0}
   shadowStepSize: 0.05
