@@ -123,7 +123,7 @@ namespace CallumNicholson.FluidExplosionURP
         private int safeMultigridStages;
         private uint threadGroupSize;
 
-        void Start()
+        void Awake()
         {
             cmd = new();
 
@@ -185,7 +185,10 @@ namespace CallumNicholson.FluidExplosionURP
             injVelocityXBuffer = new ComputeBuffer(totalVoxels, stride);
             injVelocityYBuffer = new ComputeBuffer(totalVoxels, stride);
             injVelocityZBuffer = new ComputeBuffer(totalVoxels, stride);
+        }
 
+        void OnEnable()
+        {
             for (int i = 0; i < 2; ++i)
             {
                 fluidSimCompute.SetTexture(initKernel, "VelocityWrite", velocityTexture.WriteBuffer);
@@ -197,7 +200,7 @@ namespace CallumNicholson.FluidExplosionURP
                 velocityTexture.SwapBuffers();
                 smokePropTexture.SwapBuffers();
             }
-            coarseRes = resolution;
+            Vector3Int coarseRes = resolution;
             for (int i = 0; i < safeMultigridStages; ++i)
             {
                 for (int j = 0; j < 2; ++j)
@@ -260,6 +263,7 @@ namespace CallumNicholson.FluidExplosionURP
             float safeDeltaTime = Mathf.Min(Time.deltaTime, 1.0f / 60.0f);
 
             // Global parameters
+            cmd.SetComputeIntParams(fluidSimCompute, "Resolution", resolution.x, resolution.y, resolution.z);
             cmd.SetComputeFloatParam(fluidSimCompute, "Time", Time.time);
             cmd.SetComputeFloatParam(fluidSimCompute, "DeltaTime", safeDeltaTime);
             cmd.SetComputeFloatParam(fluidSimCompute, "SimScale", simScale);
