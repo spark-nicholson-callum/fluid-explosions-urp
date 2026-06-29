@@ -169,7 +169,7 @@ Shader "Custom/SurfaceExplosionMarch"
                         float3 samplePos = saturate(surfPos + (rayDir * (_StepSize * _FireSurfaceDepth)));
                         float sampleHeat = SAMPLE_TEXTURE3D_LOD(_VolumeTex, sampler_VolumeTex, samplePos, 0).r;
 
-                        float3 fireColor = float4(blackbodyColor(sampleHeat), 1.0);
+                        float3 fireColor = blackbodyColor(sampleHeat);
 
                         // Blend accumulated smoke over the fire
                         finalColor.rgb += fireColor * (1.0 - finalColor.a);
